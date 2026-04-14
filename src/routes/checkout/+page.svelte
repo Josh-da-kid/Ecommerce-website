@@ -1,240 +1,348 @@
 <script lang="ts">
-  import { cart, cartTotal, cartSubtotal, cartSavings } from '$lib/stores';
-  import { Button, Input } from '$lib/components/ui';
-  import { formatPrice } from '$lib/utils/index';
-  import { getProductImage } from '$lib/stores/products';
-  import { toasts } from '$lib/stores/toast';
+	import { goto } from '$app/navigation';
+	import { browser } from '$app/environment';
+	import { user, isAuthenticated } from '$lib/stores/auth';
+	import { cart, cartTotal, cartSubtotal, cartSavings } from '$lib/stores';
+	import { Button, Input } from '$lib/components/ui';
+	import { formatPrice } from '$lib/utils/index';
+	import { getProductImage } from '$lib/stores/products';
+	import { toasts } from '$lib/stores/toast';
+	import { pb, type OrderItem, type ShippingAddress } from '$lib/pocketbase';
 
-  let step = $state(1);
-  let isProcessing = $state(false);
+	let isProcessing = $state(false);
+	let orderId = $state('');
+	let orderPlaced = $state(false);
+	let submitted = $state(false);
 
-  let contact = $state({ email: '', phone: '' });
-  let shipping = $state({ name: '', street: '', city: '', state: '', zip: '', country: '' });
-  let payment = $state({ cardNumber: '', expiry: '', cvv: '', nameOnCard: '' });
+	let contact = $state({ email: '', phone: '' });
+	let shipping = $state({ name: '', street: '', city: '', state: '', zip: '', country: '' });
 
-  function nextStep() {
-    if (step < 4) step++;
-  }
+	let errors = $derived({
+		email: !contact.email.trim() ? 'Email is required' : '',
+		phone: !contact.phone.trim() ? 'Phone is required' : '',
+		name: !shipping.name.trim() ? 'Name is required' : '',
+		street: !shipping.street.trim() ? 'Street address is required' : '',
+		city: !shipping.city.trim() ? 'City is required' : '',
+		state: !shipping.state.trim() ? 'State is required' : '',
+		zip: !shipping.zip.trim() ? 'ZIP code is required' : '',
+		country: !shipping.country.trim() ? 'Country is required' : ''
+	});
 
-  function prevStep() {
-    if (step > 1) step--;
-  }
+	let isValid = $derived(
+		!errors.email &&
+			!errors.phone &&
+			!errors.name &&
+			!errors.street &&
+			!errors.city &&
+			!errors.state &&
+			!errors.zip &&
+			!errors.country
+	);
 
-  async function handleSubmit() {
-    isProcessing = true;
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    cart.clear();
-    toasts.show('success', 'Order placed successfully!');
-    isProcessing = false;
-    window.location.href = '/';
-  }
+	$effect(() => {
+		if (browser && $cart.length === 0 && !orderPlaced) {
+			goto('/cart');
+		}
+	});
 
-  const steps = [
-    { number: 1, label: 'Contact' },
-    { number: 2, label: 'Shipping' },
-    { number: 3, label: 'Payment' },
-    { number: 4, label: 'Review' }
-  ];
+	$effect(() => {
+		if ($isAuthenticated && $user) {
+			contact.email = contact.email || $user.email || '';
+			contact.phone = contact.phone || $user.phone || '';
+			shipping.name = shipping.name || $user.name || '';
+		}
+	});
+
+	async function placeOrder() {
+		submitted = true;
+		if (!isValid) return;
+
+		isProcessing = true;
+
+		const now = new Date().toISOString();
+
+		const items: OrderItem[] = $cart.map((item) => ({
+			productId: item.product.id,
+			productName: item.product.name,
+			productImage: getProductImage(item.product),
+			price: item.product.price,
+			quantity: item.quantity
+		}));
+
+		const shippingAddress: ShippingAddress = {
+			name: shipping.name,
+			email: contact.email,
+			phone: contact.phone,
+			street: shipping.street,
+			city: shipping.city,
+			state: shipping.state,
+			zip: shipping.zip,
+			country: shipping.country
+		};
+
+		if (browser) {
+			try {
+				const record = await pb.collection('estore_orders').create({
+					items: JSON.stringify(items),
+					total: $cartTotal,
+					status: 'pending',
+					shippingAddress: JSON.stringify(shippingAddress),
+					paymentMethod: 'pay-on-delivery',
+					user: $user?.id || '',
+					created: now,
+					updated: now
+				});
+				orderId = record.id;
+
+				const existing = localStorage.getItem('luxe_orders');
+				const orders = existing ? JSON.parse(existing) : [];
+				orders.push({ ...record, shippingAddress, items });
+				localStorage.setItem('luxe_orders', JSON.stringify(orders));
+			} catch (e: any) {
+				toasts.show('error', 'Failed to place order. Please try again.');
+				isProcessing = false;
+				return;
+			}
+		} else {
+			orderId = 'N/A';
+		}
+
+		orderPlaced = true;
+		cart.clear();
+		toasts.show('success', `Order placed successfully! Order ID: ${orderId}`);
+		isProcessing = false;
+
+		setTimeout(() => {
+			goto('/orders');
+		}, 3000);
+	}
 </script>
 
 <svelte:head>
-  <title>Checkout - Luxe Store</title>
+	<title>Checkout - Luxe Store</title>
 </svelte:head>
 
 <div class="min-h-screen bg-bg-primary pt-24 pb-16">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <h1 class="text-4xl font-bold font-[var(--font-playfair)] text-text-primary mb-8">
-      Checkout
-    </h1>
+	<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+		<h1 class="mb-8 text-4xl font-[var(--font-playfair)] font-bold text-text-primary">Checkout</h1>
 
-    <div class="flex items-center justify-center mb-12">
-      {#each steps as s, i}
-        <div class="flex items-center">
-          <div class="flex items-center justify-center w-10 h-10 rounded-full transition-colors {step >= s.number ? 'bg-accent text-white' : 'bg-bg-secondary text-text-muted'}">
-            {s.number}
-          </div>
-          <span class="ml-2 text-sm font-medium {step >= s.number ? 'text-text-primary' : 'text-text-muted'}">{s.label}</span>
-        </div>
-        {#if i < steps.length - 1}
-          <div class="w-16 h-0.5 mx-4 {step > s.number ? 'bg-accent' : 'bg-bg-secondary'}"></div>
-        {/if}
-      {/each}
-    </div>
+		{#if orderPlaced}
+			<div class="mx-auto max-w-2xl text-center">
+				<div class="rounded-2xl bg-white p-12 shadow-lg">
+					<div
+						class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100"
+					>
+						<svg
+							class="h-10 w-10 text-green-600"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M5 13l4 4L19 7"
+							></path>
+						</svg>
+					</div>
+					<h2 class="mb-4 text-3xl font-bold text-text-primary">Order Confirmed!</h2>
+					<p class="mb-2 text-lg text-text-secondary">Thank you for your purchase.</p>
+					<p class="mb-6 text-text-muted">
+						Order ID: <span class="font-semibold text-accent">{orderId}</span>
+					</p>
+					<p class="text-sm text-text-muted">Redirecting to your orders...</p>
+				</div>
+			</div>
+		{:else}
+			<div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+				<div class="lg:col-span-2">
+					<div class="space-y-6">
+						{#if $isAuthenticated && $user}
+							<div class="rounded-2xl bg-white p-6 shadow-lg">
+								<div class="flex items-center gap-4">
+									<div
+										class="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-2xl font-bold text-white"
+									>
+										{($user.name || $user.email)[0].toUpperCase()}
+									</div>
+									<div>
+										<p class="text-lg font-semibold text-text-primary">
+											{$user.name || 'User'}
+										</p>
+										<p class="text-sm text-text-secondary">{$user.email}</p>
+									</div>
+								</div>
+							</div>
+						{/if}
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div class="lg:col-span-2">
-        <div class="bg-white rounded-2xl p-8 shadow-lg">
-          {#if step === 1}
-            <h2 class="text-2xl font-semibold text-text-primary mb-6">Contact Information</h2>
-            <div class="space-y-4">
-              <Input
-                type="email"
-                label="Email"
-                bind:value={contact.email}
-                placeholder="your@email.com"
-                required
-              />
-              <Input
-                type="tel"
-                label="Phone"
-                bind:value={contact.phone}
-                placeholder="+1 (555) 000-0000"
-                required
-              />
-            </div>
-          {:else if step === 2}
-            <h2 class="text-2xl font-semibold text-text-primary mb-6">Shipping Address</h2>
-            <div class="space-y-4">
-              <Input
-                label="Full Name"
-                bind:value={shipping.name}
-                placeholder="John Doe"
-                required
-              />
-              <Input
-                label="Street Address"
-                bind:value={shipping.street}
-                placeholder="123 Main St"
-                required
-              />
-              <div class="grid grid-cols-2 gap-4">
-                <Input
-                  label="City"
-                  bind:value={shipping.city}
-                  placeholder="New York"
-                  required
-                />
-                <Input
-                  label="State"
-                  bind:value={shipping.state}
-                  placeholder="NY"
-                  required
-                />
-              </div>
-              <div class="grid grid-cols-2 gap-4">
-                <Input
-                  label="ZIP Code"
-                  bind:value={shipping.zip}
-                  placeholder="10001"
-                  required
-                />
-                <Input
-                  label="Country"
-                  bind:value={shipping.country}
-                  placeholder="United States"
-                  required
-                />
-              </div>
-            </div>
-          {:else if step === 3}
-            <h2 class="text-2xl font-semibold text-text-primary mb-6">Payment Details</h2>
-            <div class="space-y-4">
-              <Input
-                label="Name on Card"
-                bind:value={payment.nameOnCard}
-                placeholder="John Doe"
-                required
-              />
-              <Input
-                label="Card Number"
-                bind:value={payment.cardNumber}
-                placeholder="4242 4242 4242 4242"
-                required
-              />
-              <div class="grid grid-cols-2 gap-4">
-                <Input
-                  label="Expiry Date"
-                  bind:value={payment.expiry}
-                  placeholder="MM/YY"
-                  required
-                />
-                <Input
-                  label="CVV"
-                  bind:value={payment.cvv}
-                  placeholder="123"
-                  required
-                />
-              </div>
-            </div>
-          {:else}
-            <h2 class="text-2xl font-semibold text-text-primary mb-6">Review Your Order</h2>
-            
-            <div class="space-y-6">
-              <div class="p-4 bg-bg-secondary rounded-xl">
-                <h3 class="font-semibold mb-2">Contact</h3>
-                <p class="text-text-secondary">{contact.email}</p>
-                <p class="text-text-secondary">{contact.phone}</p>
-              </div>
-              
-              <div class="p-4 bg-bg-secondary rounded-xl">
-                <h3 class="font-semibold mb-2">Shipping Address</h3>
-                <p class="text-text-secondary">{shipping.name}</p>
-                <p class="text-text-secondary">{shipping.street}</p>
-                <p class="text-text-secondary">{shipping.city}, {shipping.state} {shipping.zip}</p>
-                <p class="text-text-secondary">{shipping.country}</p>
-              </div>
-              
-              <div class="p-4 bg-bg-secondary rounded-xl">
-                <h3 class="font-semibold mb-2">Payment</h3>
-                <p class="text-text-secondary">Card ending in {payment.cardNumber.slice(-4)}</p>
-              </div>
-            </div>
-          {/if}
+						<div class="rounded-2xl bg-white p-8 shadow-lg">
+							<h2 class="mb-6 text-xl font-semibold text-text-primary">Shipping Information</h2>
+							<div class="space-y-4">
+								<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+									<Input
+										type="email"
+										label="Email"
+										bind:value={contact.email}
+										placeholder="your@email.com"
+										error={submitted ? errors.email : ''}
+										required
+									/>
+									<Input
+										type="tel"
+										label="Phone"
+										bind:value={contact.phone}
+										placeholder="+1 (555) 000-0000"
+										error={submitted ? errors.phone : ''}
+										required
+									/>
+								</div>
 
-          <div class="flex gap-4 mt-8">
-            {#if step > 1}
-              <Button variant="secondary" onclick={prevStep}>Back</Button>
-            {/if}
-            {#if step < 4}
-              <Button variant="primary" class="flex-1" onclick={nextStep}>
-                Continue
-              </Button>
-            {:else}
-              <Button variant="primary" class="flex-1" loading={isProcessing} onclick={handleSubmit}>
-                Place Order
-              </Button>
-            {/if}
-          </div>
-        </div>
-      </div>
+								<hr class="border-border" />
 
-      <div class="lg:col-span-1">
-        <div class="bg-white rounded-2xl p-6 shadow-lg sticky top-24">
-          <h2 class="text-xl font-semibold text-text-primary mb-6">Order Summary</h2>
-          
-          <div class="space-y-4 mb-6 max-h-60 overflow-y-auto">
-            {#each $cart as item}
-              <div class="flex gap-4">
-                <div class="w-16 h-16 rounded-lg overflow-hidden bg-bg-secondary flex-shrink-0">
-                  <img src={getProductImage(item.product)} alt="" class="w-full h-full object-cover" />
-                </div>
-                <div class="flex-1">
-                  <p class="font-medium text-sm">{item.product.name}</p>
-                  <p class="text-text-muted text-sm">Qty: {item.quantity}</p>
-                </div>
-                <p class="font-semibold">{formatPrice(item.product.price * item.quantity)}</p>
-              </div>
-            {/each}
-          </div>
+								<Input
+									label="Full Name"
+									bind:value={shipping.name}
+									placeholder="John Doe"
+									error={submitted ? errors.name : ''}
+									required
+								/>
+								<Input
+									label="Street Address"
+									bind:value={shipping.street}
+									placeholder="123 Main St"
+									error={submitted ? errors.street : ''}
+									required
+								/>
+								<div class="grid grid-cols-2 gap-4">
+									<Input
+										label="City"
+										bind:value={shipping.city}
+										placeholder="Lagos"
+										error={submitted ? errors.city : ''}
+										required
+									/>
+									<Input
+										label="State"
+										bind:value={shipping.state}
+										placeholder="Lagos"
+										error={submitted ? errors.state : ''}
+										required
+									/>
+								</div>
+								<div class="grid grid-cols-2 gap-4">
+									<Input
+										label="ZIP Code"
+										bind:value={shipping.zip}
+										placeholder="10001"
+										error={submitted ? errors.zip : ''}
+										required
+									/>
+									<Input
+										label="Country"
+										bind:value={shipping.country}
+										placeholder="Nigeria"
+										error={submitted ? errors.country : ''}
+										required
+									/>
+								</div>
+							</div>
+						</div>
 
-          <div class="border-t border-border pt-4 space-y-2">
-            <div class="flex justify-between text-text-secondary">
-              <span>Subtotal</span>
-              <span>{formatPrice($cartSubtotal)}</span>
-            </div>
-            {#if $cartSavings > 0}
-              <div class="flex justify-between text-success">
-                <span>Savings</span>
-                <span>-{formatPrice($cartSavings)}</span>
-              </div>
-            {/if}
-            <div class="flex justify-between text-lg font-semibold pt-2 border-t border-border">
-              <span>Total</span>
-              <span class="text-accent">{formatPrice($cartTotal)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+						<div class="rounded-2xl bg-white p-8 shadow-lg">
+							<h2 class="mb-4 text-xl font-semibold text-text-primary">Payment Method</h2>
+							<label
+								class="flex cursor-pointer items-center gap-4 rounded-xl border-2 border-accent bg-accent/5 p-4"
+							>
+								<input type="radio" name="payment" checked class="h-5 w-5 text-accent" />
+								<div class="flex items-center gap-3">
+									<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
+										<svg
+											class="h-5 w-5 text-accent"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+											></path>
+										</svg>
+									</div>
+									<div>
+										<p class="font-medium text-text-primary">Pay on Delivery</p>
+										<p class="text-sm text-text-muted">Payment upon delivery</p>
+									</div>
+								</div>
+							</label>
+						</div>
+
+						<Button
+							variant="primary"
+							class="w-full"
+							size="lg"
+							loading={isProcessing}
+							onclick={placeOrder}
+						>
+							{isProcessing
+								? 'Placing Order...'
+								: `Place Order  \u2022  ${formatPrice($cartTotal)}`}
+						</Button>
+
+						{#if !$isAuthenticated}
+							<p class="text-center text-sm text-text-secondary">
+								Have an account?
+								<a href="/login" class="font-medium text-accent hover:underline">Sign in</a>
+								for a faster checkout
+							</p>
+						{/if}
+					</div>
+				</div>
+
+				<div class="lg:col-span-1">
+					<div class="sticky top-24 rounded-2xl bg-white p-6 shadow-lg">
+						<h2 class="mb-6 text-xl font-semibold text-text-primary">Order Summary</h2>
+
+						<div class="mb-6 max-h-60 space-y-4 overflow-y-auto">
+							{#each $cart as item}
+								<div class="flex gap-4">
+									<div class="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-bg-secondary">
+										<img
+											src={getProductImage(item.product)}
+											alt=""
+											class="h-full w-full object-cover"
+										/>
+									</div>
+									<div class="flex-1">
+										<p class="text-sm font-medium">{item.product.name}</p>
+										<p class="text-sm text-text-muted">Qty: {item.quantity}</p>
+									</div>
+									<p class="font-semibold">{formatPrice(item.product.price * item.quantity)}</p>
+								</div>
+							{/each}
+						</div>
+
+						<div class="space-y-2 border-t border-border pt-4">
+							<div class="flex justify-between text-text-secondary">
+								<span>Subtotal</span>
+								<span>{formatPrice($cartSubtotal)}</span>
+							</div>
+							{#if $cartSavings > 0}
+								<div class="flex justify-between text-success">
+									<span>Savings</span>
+									<span>-{formatPrice($cartSavings)}</span>
+								</div>
+							{/if}
+							<div class="flex justify-between border-t border-border pt-2 text-lg font-semibold">
+								<span>Total</span>
+								<span class="text-accent">{formatPrice($cartTotal)}</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		{/if}
+	</div>
 </div>

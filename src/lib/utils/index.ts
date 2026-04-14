@@ -20,9 +20,9 @@ export function cn(...inputs: any[]): string {
 }
 
 export function formatPrice(price: number): string {
-	return new Intl.NumberFormat('en-US', {
+	return new Intl.NumberFormat('en-NG', {
 		style: 'currency',
-		currency: 'USD'
+		currency: 'NGN'
 	}).format(price);
 }
 

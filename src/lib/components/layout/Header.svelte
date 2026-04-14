@@ -23,6 +23,7 @@
 	const navLinks = [
 		{ href: '/', label: 'Home' },
 		{ href: '/products', label: 'Shop' },
+		{ href: '/orders', label: 'Orders' },
 		{ href: '/wishlist', label: 'Wishlist' }
 	];
 </script>
