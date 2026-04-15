@@ -5,17 +5,41 @@
 	import { ProductCard } from '$lib/components/product';
 	import { cart, wishlist } from '$lib/stores';
 	import { toasts } from '$lib/stores/toast';
-	import { getProductImage, fetchProductById, products } from '$lib/stores/products';
+	import {
+		getProductImage,
+		getProductImages,
+		fetchProductById,
+		products
+	} from '$lib/stores/products';
 	import { formatPrice } from '$lib/utils/index';
-	import { parseImages, type Product } from '$lib/pocketbase';
+	import { type Product } from '$lib/pocketbase';
 
 	let product = $state<Product | null>(null);
 	let quantity = $state(1);
-	let selectedImage = $state(0);
+	let currentSlide = $state(0);
 	let isAddingToCart = $state(false);
 	let activeTab = $state<'description' | 'reviews' | 'shipping'>('description');
+	let selectedColor = $state('');
+	let selectedSize = $state('');
+	let variantError = $state('');
 
 	const productId = $page.params.id;
+
+	let allImages = $derived(product ? getProductImages(product) : ['/placeholder-product.svg']);
+	let totalSlides = $derived(allImages.length);
+
+	function nextSlide() {
+		currentSlide = (currentSlide + 1) % totalSlides;
+	}
+
+	function prevSlide() {
+		currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
+	}
+
+	let availableColors = $derived(Array.isArray(product?.colors) ? product!.colors : []);
+	let availableSizes = $derived(Array.isArray(product?.sizes) ? product!.sizes : []);
+	let needsColor = $derived(availableColors.length > 0);
+	let needsSize = $derived(availableSizes.length > 0);
 
 	onMount(async () => {
 		const fetched = await fetchProductById(productId);
@@ -31,17 +55,46 @@
 
 	function handleAddToCart() {
 		if (!product) return;
+		variantError = '';
+
+		if (needsColor && !selectedColor) {
+			variantError = 'Please select a color';
+			return;
+		}
+		if (needsSize && !selectedSize) {
+			variantError = 'Please select a size';
+			return;
+		}
+
+		if (quantity > product.stock) {
+			variantError = `Only ${product.stock} items available in stock`;
+			return;
+		}
+
 		isAddingToCart = true;
-		cart.addItem(product, quantity);
+		const color = needsColor ? selectedColor : '';
+		const size = needsSize ? selectedSize : '';
+		cart.addItem(product, quantity, color, size);
 		toasts.show('success', `${product.name} added to cart`);
 		setTimeout(() => (isAddingToCart = false), 500);
 	}
 
+	function incrementQty() {
+		if (!product) return;
+		if (quantity < product.stock) {
+			quantity++;
+		}
+	}
+
+	function decrementQty() {
+		quantity = Math.max(1, quantity - 1);
+	}
+
 	function toggleWishlist() {
 		if (!product) return;
+		const wasInWishlist = wishlistValue.includes(product.id);
 		wishlist.toggle(product.id);
-		const isInWishlist = $wishlist.includes(product.id);
-		toasts.show('info', isInWishlist ? 'Removed from wishlist' : 'Added to wishlist');
+		toasts.show('info', wasInWishlist ? 'Removed from wishlist' : 'Added to wishlist');
 	}
 
 	let wishlistValue = $state<string[]>([]);
@@ -53,10 +106,11 @@
 	let isInWishlist = $derived(product ? wishlistValue.includes(product.id) : false);
 	let hasDiscount = $derived(product?.comparePrice && product.comparePrice > product.price);
 	let isLowStock = $derived(product ? product.stock <= 10 && product.stock > 0 : false);
+	let isOutOfStock = $derived(product ? product.stock === 0 : false);
 	let relatedProducts = $derived(
 		product
 			? productsValue
-					.filter((p) => p.category === product.category && p.id !== product.id)
+					.filter((p) => p.category === product!.category && p.id !== product!.id)
 					.slice(0, 4)
 			: []
 	);
@@ -80,32 +134,91 @@
 			<div class="mb-16 grid grid-cols-1 gap-12 lg:grid-cols-2">
 				<div class="space-y-4">
 					<div class="relative aspect-square overflow-hidden rounded-2xl bg-bg-secondary">
-						<img
-							src={getProductImage(product)}
-							alt={product.name}
-							class="h-full w-full object-cover"
-						/>
+						{#each allImages as src, i}
+							<div
+								class="absolute inset-0 transition-transform duration-500 ease-in-out {i ===
+								currentSlide
+									? 'translate-x-0'
+									: i < currentSlide
+										? '-translate-x-full'
+										: 'translate-x-full'}"
+							>
+								<img
+									{src}
+									alt="{product!.name} - Image {i + 1}"
+									class="h-full w-full object-cover"
+								/>
+							</div>
+						{/each}
+
 						{#if hasDiscount}
-							<Badge variant="error" class="absolute top-4 left-4">Sale</Badge>
+							<Badge variant="error" class="absolute top-4 left-4 z-10">Sale</Badge>
 						{/if}
-						{#if isLowStock}
-							<Badge variant="warning" class="absolute bottom-4 left-4">
-								Only {product.stock} left
+						{#if isOutOfStock}
+							<Badge variant="error" class="absolute bottom-4 left-4 z-10">Out of Stock</Badge>
+						{:else if isLowStock}
+							<Badge variant="warning" class="absolute bottom-4 left-4 z-10">
+								Only {product!.stock} left
 							</Badge>
+						{/if}
+
+						{#if totalSlides > 1}
+							<button
+								class="absolute top-1/2 left-3 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow-md transition-colors hover:bg-white"
+								onclick={prevSlide}
+								aria-label="Previous image"
+							>
+								<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M15 19l-7-7 7-7"
+									/>
+								</svg>
+							</button>
+							<button
+								class="absolute top-1/2 right-3 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow-md transition-colors hover:bg-white"
+								onclick={nextSlide}
+								aria-label="Next image"
+							>
+								<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M9 5l7 7-7 7"
+									/>
+								</svg>
+							</button>
+
+							<div
+								class="absolute right-4 bottom-4 z-10 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1"
+							>
+								{#each allImages as _, i}
+									<button
+										class="h-2 w-2 rounded-full transition-all {i === currentSlide
+											? 'w-4 bg-white'
+											: 'bg-white/50'}"
+										onclick={() => (currentSlide = i)}
+										aria-label="Go to image {i + 1}"
+									></button>
+								{/each}
+							</div>
 						{/if}
 					</div>
 
-					{#if parseImages(product.images).length > 1}
-						<div class="flex gap-4">
-							{#each parseImages(product.images) as image, i}
+					{#if totalSlides > 1}
+						<div class="flex gap-3 overflow-x-auto pb-1">
+							{#each allImages as src, i}
 								<button
-									class="h-20 w-20 overflow-hidden rounded-xl border-2 transition-colors {selectedImage ===
+									class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all {currentSlide ===
 									i
-										? 'border-accent'
-										: 'border-transparent'}"
-									onclick={() => (selectedImage = i)}
+										? 'border-accent ring-1 ring-accent/30'
+										: 'border-transparent opacity-70 hover:opacity-100'}"
+									onclick={() => (currentSlide = i)}
 								>
-									<img src={image} alt="" class="h-full w-full object-cover" />
+									<img {src} alt="Thumbnail {i + 1}" class="h-full w-full object-cover" />
 								</button>
 							{/each}
 						</div>
@@ -128,15 +241,85 @@
 						{/if}
 					</div>
 
+					<div
+						class="mb-4 text-sm font-medium {isOutOfStock
+							? 'text-error'
+							: product.stock <= 10
+								? 'text-amber-600'
+								: 'text-green-600'}"
+					>
+						{#if isOutOfStock}
+							Out of Stock
+						{:else if product.stock <= 5}
+							Hurry! Only {product.stock} pieces left
+						{:else if product.stock <= 20}
+							{product.stock} pieces available
+						{:else}
+							In Stock ({product.stock} available)
+						{/if}
+					</div>
+
 					<p class="mb-8 text-text-secondary">
 						{product.description}
 					</p>
+
+					{#if needsColor}
+						<div class="mb-6">
+							<label class="mb-3 block text-sm font-semibold text-text-primary">
+								Color <span class="text-error">*</span>
+								{#if selectedColor}
+									<span class="ml-2 font-normal text-text-secondary">({selectedColor})</span>
+								{/if}
+							</label>
+							<div class="flex flex-wrap gap-2">
+								{#each availableColors as color}
+									<button
+										class="rounded-xl border-2 px-4 py-2 text-sm font-medium transition-all {selectedColor ===
+										color
+											? 'border-accent bg-accent/10 text-accent'
+											: 'border-border text-text-secondary hover:border-accent/50'}"
+										onclick={() => (selectedColor = color)}
+									>
+										{color}
+									</button>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					{#if needsSize}
+						<div class="mb-6">
+							<label class="mb-3 block text-sm font-semibold text-text-primary">
+								Size <span class="text-error">*</span>
+								{#if selectedSize}
+									<span class="ml-2 font-normal text-text-secondary">({selectedSize})</span>
+								{/if}
+							</label>
+							<div class="flex flex-wrap gap-2">
+								{#each availableSizes as size}
+									<button
+										class="rounded-xl border-2 px-4 py-2 text-sm font-medium transition-all {selectedSize ===
+										size
+											? 'border-accent bg-accent/10 text-accent'
+											: 'border-border text-text-secondary hover:border-accent/50'}"
+										onclick={() => (selectedSize = size)}
+									>
+										{size}
+									</button>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					{#if variantError}
+						<p class="mb-4 text-sm font-medium text-error">{variantError}</p>
+					{/if}
 
 					<div class="mb-8 flex items-center gap-4">
 						<div class="flex items-center rounded-xl border border-border">
 							<button
 								class="flex h-12 w-12 items-center justify-center transition-colors hover:bg-bg-secondary"
-								onclick={() => (quantity = Math.max(1, quantity - 1))}
+								onclick={decrementQty}
 							>
 								<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path
@@ -150,7 +333,7 @@
 							<span class="w-12 text-center font-medium">{quantity}</span>
 							<button
 								class="flex h-12 w-12 items-center justify-center transition-colors hover:bg-bg-secondary"
-								onclick={() => quantity++}
+								onclick={incrementQty}
 							>
 								<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path
@@ -190,9 +373,10 @@
 						size="lg"
 						class="mb-4 w-full"
 						loading={isAddingToCart}
+						disabled={isOutOfStock}
 						onclick={handleAddToCart}
 					>
-						{isAddingToCart ? 'Added!' : 'Add to Cart'}
+						{isOutOfStock ? 'Out of Stock' : isAddingToCart ? 'Added!' : 'Add to Cart'}
 					</Button>
 
 					<div class="flex items-center gap-6 text-sm text-text-secondary">

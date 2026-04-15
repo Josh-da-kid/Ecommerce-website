@@ -39,26 +39,26 @@
 ### Color Palette
 
 ```css
---color-primary: #1a1a1a;          /* Rich Black */
---color-primary-light: #2d2d2d;    /* Charcoal */
---color-accent: #c9a962;           /* Champagne Gold */
---color-accent-hover: #dfc07a;     /* Light Gold */
---color-success: #22c55e;          /* Green */
---color-warning: #f59e0b;          /* Amber */
---color-error: #ef4444;            /* Red */
+--color-primary: #1a1a1a; /* Rich Black */
+--color-primary-light: #2d2d2d; /* Charcoal */
+--color-accent: #c9a962; /* Champagne Gold */
+--color-accent-hover: #dfc07a; /* Light Gold */
+--color-success: #22c55e; /* Green */
+--color-warning: #f59e0b; /* Amber */
+--color-error: #ef4444; /* Red */
 
---color-bg-primary: #fafafa;       /* Off White */
---color-bg-secondary: #f5f5f5;     /* Light Gray */
---color-bg-card: #ffffff;          /* White */
---color-bg-dark: #0f0f0f;          /* Near Black */
+--color-bg-primary: #fafafa; /* Off White */
+--color-bg-secondary: #f5f5f5; /* Light Gray */
+--color-bg-card: #ffffff; /* White */
+--color-bg-dark: #0f0f0f; /* Near Black */
 
---color-text-primary: #1a1a1a;     /* Primary Text */
---color-text-secondary: #6b7280;   /* Secondary Text */
---color-text-muted: #9ca3af;      /* Muted Text */
---color-text-inverse: #ffffff;    /* White Text */
+--color-text-primary: #1a1a1a; /* Primary Text */
+--color-text-secondary: #6b7280; /* Secondary Text */
+--color-text-muted: #9ca3af; /* Muted Text */
+--color-text-inverse: #ffffff; /* White Text */
 
---border-color: #e5e7eb;           /* Light Border */
---border-color-dark: #374151;     /* Dark Border */
+--border-color: #e5e7eb; /* Light Border */
+--border-color-dark: #374151; /* Dark Border */
 ```
 
 ### Spacing Scale (8px System)
@@ -167,6 +167,7 @@ border: 1px solid rgba(255, 255, 255, 0.3);
 ### 1. Landing Page (`/`)
 
 **Hero Section**
+
 - Full viewport height
 - Three.js animated particle background (subtle)
 - Large display headline: "Elevate Your Style"
@@ -175,21 +176,25 @@ border: 1px solid rgba(255, 255, 255, 0.3);
 - Scroll indicator at bottom
 
 **Features Section**
+
 - 4-column grid
 - Icon + title + description
 - Staggered reveal animation
 
 **Featured Products**
+
 - Section title
 - 4-product grid
 - Quick view on hover
 
 **Newsletter Section**
+
 - Email capture form
 - Glassmorphism card
 - Animated input
 
 **Footer**
+
 - 4-column layout
 - Links, social, newsletter
 - Copyright

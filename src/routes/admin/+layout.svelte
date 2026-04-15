@@ -7,7 +7,7 @@
 
 	let { children } = $props();
 
-	let sidebarOpen = $state(true);
+	let sidebarOpen = $state(false);
 	let loading = $state(true);
 
 	function checkAuth() {
@@ -75,13 +75,38 @@
 	</div>
 {:else}
 	<div class="flex min-h-screen bg-bg-secondary">
+		{#if sidebarOpen}
+			<div
+				class="fixed inset-0 z-40 bg-black/50 lg:hidden"
+				onclick={() => (sidebarOpen = false)}
+				onkeydown={() => {}}
+				role="button"
+				tabindex="-1"
+				aria-label="Close sidebar"
+			></div>
+		{/if}
+
 		<aside
 			class="fixed inset-y-0 left-0 z-50 w-64 flex-shrink-0 bg-primary text-white transition-transform duration-300 {sidebarOpen
 				? 'translate-x-0'
-				: '-translate-x-full'} lg:translate-x-0"
+				: '-translate-x-full'}"
 		>
-			<div class="p-6">
+			<div class="flex items-center justify-between p-6">
 				<a href="/admin" class="text-2xl font-[var(--font-playfair)] font-bold">Admin</a>
+				<button
+					class="rounded-lg p-1 hover:bg-white/10"
+					onclick={() => (sidebarOpen = false)}
+					aria-label="Close sidebar"
+				>
+					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M6 18L18 6M6 6l12 12"
+						/>
+					</svg>
+				</button>
 			</div>
 
 			<nav class="mt-6 px-4">
@@ -92,6 +117,7 @@
 							.pathname === item.href
 							? 'bg-accent text-white'
 							: 'hover:bg-white/10'}"
+						onclick={() => (sidebarOpen = false)}
 					>
 						<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={item.icon} />
@@ -134,26 +160,39 @@
 			</div>
 		</aside>
 
-		<div class="flex-1 lg:ml-64">
+		<div class="flex-1">
 			<header class="flex items-center justify-between bg-white px-6 py-4 shadow-sm">
-				<button
-					class="rounded-lg p-2 hover:bg-bg-secondary lg:hidden"
-					onclick={() => (sidebarOpen = !sidebarOpen)}
-					aria-label="Toggle sidebar"
-				>
-					<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M4 6h16M4 12h16M4 18h16"
-						/>
-					</svg>
-				</button>
+				<div class="flex items-center gap-3">
+					<button
+						class="rounded-lg p-2 hover:bg-bg-secondary"
+						onclick={() => (sidebarOpen = !sidebarOpen)}
+						aria-label="Toggle sidebar"
+					>
+						{#if sidebarOpen}
+							<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M6 18L18 6M6 6l12 12"
+								/>
+							</svg>
+						{:else}
+							<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M4 6h16M4 12h16M4 18h16"
+								/>
+							</svg>
+						{/if}
+					</button>
 
-				<h1 class="text-xl font-semibold text-text-primary">
-					{navItems.find((n) => n.href === $page.url.pathname)?.label || 'Admin'}
-				</h1>
+					<h1 class="text-xl font-semibold text-text-primary">
+						{navItems.find((n) => n.href === $page.url.pathname)?.label || 'Admin'}
+					</h1>
+				</div>
 
 				<div class="flex items-center gap-4">
 					<span class="text-sm text-text-secondary">Admin</span>

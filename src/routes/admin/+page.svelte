@@ -35,18 +35,36 @@
 		});
 	}
 
-	onMount(async () => {
-		try {
-			const records = await pb.collection('estore_orders').getFullList<Order>({
-				sort: '-created'
-			});
-			orders = records;
-		} catch (error) {
-			console.error('Failed to fetch orders:', error);
-			orders = [];
-		} finally {
-			isLoading = false;
-		}
+	onMount(() => {
+		(async () => {
+			try {
+				const records = await pb.collection('estore_orders').getFullList<Order>({
+					sort: '-created'
+				});
+				orders = records;
+			} catch (error) {
+				console.error('Failed to fetch orders:', error);
+				orders = [];
+			} finally {
+				isLoading = false;
+			}
+		})();
+
+		pb.collection('estore_orders').subscribe('*', (e) => {
+			if (e.action === 'create') {
+				orders = [e.record as unknown as Order, ...orders];
+			} else if (e.action === 'update') {
+				orders = orders.map((o) => (o.id === e.record.id ? (e.record as unknown as Order) : o));
+			} else if (e.action === 'delete') {
+				orders = orders.filter((o) => o.id !== e.record.id);
+			}
+		});
+
+		return () => {
+			pb.collection('estore_orders')
+				.unsubscribe('*')
+				.catch(() => {});
+		};
 	});
 </script>
 

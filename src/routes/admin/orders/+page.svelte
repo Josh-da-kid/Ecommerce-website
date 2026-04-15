@@ -54,7 +54,25 @@
 		expandedOrderId = expandedOrderId === id ? null : id;
 	}
 
-	onMount(fetchOrders);
+	onMount(() => {
+		fetchOrders();
+
+		pb.collection('estore_orders').subscribe('*', (e) => {
+			if (e.action === 'create') {
+				orders = [e.record as unknown as Order, ...orders];
+			} else if (e.action === 'update') {
+				orders = orders.map((o) => (o.id === e.record.id ? (e.record as unknown as Order) : o));
+			} else if (e.action === 'delete') {
+				orders = orders.filter((o) => o.id !== e.record.id);
+			}
+		});
+
+		return () => {
+			pb.collection('estore_orders')
+				.unsubscribe('*')
+				.catch(() => {});
+		};
+	});
 </script>
 
 <svelte:head>
@@ -220,6 +238,22 @@
 																	Qty: {item.quantity} &times;
 																	{formatPrice(item.price)}
 																</p>
+																{#if item.color || item.size}
+																	<div class="mt-0.5 flex gap-1">
+																		{#if item.color}
+																			<span
+																				class="inline-flex items-center rounded bg-bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-text-secondary"
+																				>{item.color}</span
+																			>
+																		{/if}
+																		{#if item.size}
+																			<span
+																				class="inline-flex items-center rounded bg-bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-text-secondary"
+																				>{item.size}</span
+																			>
+																		{/if}
+																	</div>
+																{/if}
 															</div>
 															<span class="text-sm font-semibold text-accent">
 																{formatPrice(item.price * item.quantity)}

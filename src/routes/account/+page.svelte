@@ -3,28 +3,68 @@
 	import { goto } from '$app/navigation';
 	import { user, isAuthenticated, isAdmin, logout } from '$lib/stores/auth';
 	import { browser } from '$app/environment';
+	import { pb, type Order } from '$lib/pocketbase';
 	import { formatPrice } from '$lib/utils/index';
 	import { Button } from '$lib/components/ui';
 
 	let loaded = $state(false);
 	let activeTab = $state<'profile' | 'orders' | 'settings'>('profile');
-	let orders = $state<any[]>([]);
+	let orders = $state<Order[]>([]);
+
+	async function fetchOrders() {
+		try {
+			const stored = browser ? localStorage.getItem('luxe_orders') : null;
+			if (stored) {
+				const localOrders: Order[] = JSON.parse(stored);
+				const localIds = localOrders.map((o) => o.id);
+				const records = await pb
+					.collection('estore_orders')
+					.getFullList<Order>({ sort: '-created' });
+
+				const remoteIds = new Set(records.map((r) => r.id));
+				const missing = localOrders.filter((o) => !remoteIds.has(o.id));
+
+				orders = [...records, ...missing].sort(
+					(a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
+				);
+			} else {
+				orders = await pb.collection('estore_orders').getFullList<Order>({ sort: '-created' });
+			}
+		} catch {
+			if (browser) {
+				try {
+					const stored = localStorage.getItem('luxe_orders');
+					if (stored) {
+						orders = JSON.parse(stored);
+					}
+				} catch {}
+			}
+		}
+	}
 
 	onMount(() => {
 		if (browser && !$isAuthenticated) {
 			goto('/login');
 		}
-		if (browser) {
-			const stored = localStorage.getItem('luxe_orders');
-			if (stored) {
-				try {
-					orders = JSON.parse(stored);
-				} catch {
-					orders = [];
-				}
+		fetchOrders().then(() => {
+			loaded = true;
+		});
+
+		pb.collection('estore_orders').subscribe('*', (e) => {
+			if (e.action === 'create') {
+				orders = [e.record as unknown as Order, ...orders];
+			} else if (e.action === 'update') {
+				orders = orders.map((o) => (o.id === e.record.id ? (e.record as unknown as Order) : o));
+			} else if (e.action === 'delete') {
+				orders = orders.filter((o) => o.id !== e.record.id);
 			}
-		}
-		loaded = true;
+		});
+
+		return () => {
+			pb.collection('estore_orders')
+				.unsubscribe('*')
+				.catch(() => {});
+		};
 	});
 
 	const statusColors: Record<string, string> = {

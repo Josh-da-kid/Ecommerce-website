@@ -1,12 +1,13 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { pb, type Order } from '$lib/pocketbase';
 	import { formatPrice } from '$lib/utils/index';
 	import { Button } from '$lib/components/ui';
-	import { getProductImage } from '$lib/stores/products';
-	import type { Order } from '$lib/pocketbase';
 
 	let orders = $state<Order[]>([]);
 	let expandedOrderId = $state<string | null>(null);
+	let loading = $state(true);
 
 	let activeOrders = $derived(
 		orders.filter(
@@ -17,20 +18,60 @@
 		orders.filter((o) => o.status === 'delivered' || o.status === 'cancelled')
 	);
 
-	$effect(() => {
-		if (browser) {
-			try {
-				const stored = localStorage.getItem('luxe_orders');
-				if (stored) {
-					const parsed = JSON.parse(stored) as Order[];
-					orders = parsed.sort(
-						(a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
-					);
-				}
-			} catch (e) {
-				console.error('Failed to load orders:', e);
+	async function fetchOrders() {
+		loading = true;
+		try {
+			const stored = browser ? localStorage.getItem('luxe_orders') : null;
+			if (stored) {
+				const localOrders: Order[] = JSON.parse(stored);
+				const localIds = localOrders.map((o) => o.id);
+				const records = await pb
+					.collection('estore_orders')
+					.getFullList<Order>({ sort: '-created' });
+
+				const remoteIds = new Set(records.map((r) => r.id));
+				const missing = localOrders.filter((o) => !remoteIds.has(o.id));
+
+				orders = [...records, ...missing].sort(
+					(a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
+				);
+			} else {
+				orders = await pb.collection('estore_orders').getFullList<Order>({ sort: '-created' });
 			}
+		} catch {
+			if (browser) {
+				try {
+					const stored = localStorage.getItem('luxe_orders');
+					if (stored) {
+						orders = (JSON.parse(stored) as Order[]).sort(
+							(a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
+						);
+					}
+				} catch {}
+			}
+		} finally {
+			loading = false;
 		}
+	}
+
+	onMount(() => {
+		fetchOrders();
+
+		pb.collection('estore_orders').subscribe('*', (e) => {
+			if (e.action === 'create') {
+				orders = [e.record as unknown as Order, ...orders];
+			} else if (e.action === 'update') {
+				orders = orders.map((o) => (o.id === e.record.id ? (e.record as unknown as Order) : o));
+			} else if (e.action === 'delete') {
+				orders = orders.filter((o) => o.id !== e.record.id);
+			}
+		});
+
+		return () => {
+			pb.collection('estore_orders')
+				.unsubscribe('*')
+				.catch(() => {});
+		};
 	});
 
 	function formatDate(dateStr: string): string {
@@ -76,7 +117,13 @@
 			</a>
 		</div>
 
-		{#if orders.length === 0}
+		{#if loading}
+			<div class="flex items-center justify-center py-20">
+				<div
+					class="h-10 w-10 animate-spin rounded-full border-4 border-accent border-t-transparent"
+				></div>
+			</div>
+		{:else if orders.length === 0}
 			<div class="py-16 text-center">
 				<svg
 					class="mx-auto mb-6 h-24 w-24 text-text-muted"

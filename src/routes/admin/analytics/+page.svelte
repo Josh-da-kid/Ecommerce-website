@@ -27,19 +27,52 @@
 
 	const barFills = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'];
 
-	onMount(async () => {
-		try {
-			const [ordersResult, productsResult] = await Promise.all([
-				pb.collection('estore_orders').getFullList<Order>({ sort: '-created' }),
-				pb.collection('estore_products').getFullList<Product>()
-			]);
-			orders = ordersResult;
-			products = productsResult;
-		} catch (e: any) {
-			error = e.message || 'Failed to load analytics data';
-		} finally {
-			loading = false;
-		}
+	onMount(() => {
+		(async () => {
+			try {
+				const [ordersResult, productsResult] = await Promise.all([
+					pb.collection('estore_orders').getFullList<Order>({ sort: '-created' }),
+					pb.collection('estore_products').getFullList<Product>()
+				]);
+				orders = ordersResult;
+				products = productsResult;
+			} catch (e: any) {
+				error = e.message || 'Failed to load analytics data';
+			} finally {
+				loading = false;
+			}
+		})();
+
+		pb.collection('estore_orders').subscribe('*', (e) => {
+			if (e.action === 'create') {
+				orders = [e.record as unknown as Order, ...orders];
+			} else if (e.action === 'update') {
+				orders = orders.map((o) => (o.id === e.record.id ? (e.record as unknown as Order) : o));
+			} else if (e.action === 'delete') {
+				orders = orders.filter((o) => o.id !== e.record.id);
+			}
+		});
+
+		pb.collection('estore_products').subscribe('*', (e) => {
+			if (e.action === 'create') {
+				products = [e.record as unknown as Product, ...products];
+			} else if (e.action === 'update') {
+				products = products.map((p) =>
+					p.id === e.record.id ? (e.record as unknown as Product) : p
+				);
+			} else if (e.action === 'delete') {
+				products = products.filter((p) => p.id !== e.record.id);
+			}
+		});
+
+		return () => {
+			pb.collection('estore_orders')
+				.unsubscribe('*')
+				.catch(() => {});
+			pb.collection('estore_products')
+				.unsubscribe('*')
+				.catch(() => {});
+		};
 	});
 
 	let totalRevenue = $derived(orders.reduce((sum, o) => sum + (o.total || 0), 0));
@@ -47,20 +80,21 @@
 	let totalOrders = $derived(orders.length);
 
 	let monthlyRevenueData = $derived(() => {
-		const months: { label: string; revenue: number }[] = [];
+		const months: { label: string; revenue: number; shortLabel: string }[] = [];
 		const now = new Date();
 		for (let i = 5; i >= 0; i--) {
 			const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
 			const year = d.getFullYear();
 			const month = d.getMonth();
 			const label = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+			const shortLabel = d.toLocaleString('default', { month: 'short' });
 			const revenue = orders
 				.filter((o) => {
 					const od = new Date(o.created);
 					return od.getFullYear() === year && od.getMonth() === month;
 				})
 				.reduce((sum, o) => sum + (o.total || 0), 0);
-			months.push({ label, revenue });
+			months.push({ label, revenue, shortLabel });
 		}
 		return months;
 	});
@@ -264,35 +298,118 @@
 					</div>
 				{:else}
 					{@const revData = monthlyRevenueData()}
-					<svg
-						viewBox="0 0 500 250"
-						class="w-full"
-						role="img"
-						aria-label="Monthly revenue bar chart"
-					>
-						{#each revData as month, i}
-							{@const barHeight = (month.revenue / maxMonthlyRevenue) * 180}
-							{@const x = 45 + i * 75}
-							{@const y = 210 - barHeight}
-							<rect {x} {y} width={50} height={barHeight} fill="#2563eb" rx="4" opacity="0.85">
-								<title>{month.label}: {formatPrice(month.revenue)}</title>
-							</rect>
-							<text
-								x={x + 25}
-								y={barHeight > 30 ? y + 18 : y - 6}
-								text-anchor="middle"
-								fill={barHeight > 30 ? '#fff' : '#6b7280'}
-								font-size="10"
-								font-weight="600"
-							>
-								{formatPrice(month.revenue)}
-							</text>
-							<text x={x + 25} y="235" text-anchor="middle" fill="#6b7280" font-size="11">
-								{month.label}
-							</text>
-						{/each}
-						<line x1="40" y1="210" x2="490" y2="210" stroke="#e5e7eb" stroke-width="1" />
-					</svg>
+					{@const peak = maxMonthlyRevenue}
+					{@const niceMax = Math.ceil(peak / 5) * 5 || 1}
+					{@const gridLines = 5}
+					{@const chartLeft = 70}
+					{@const chartRight = 20}
+					{@const chartTop = 20}
+					{@const chartBottom = 40}
+					{@const svgW = 500}
+					{@const svgH = 280}
+					{@const plotW = svgW - chartLeft - chartRight}
+					{@const plotH = svgH - chartTop - chartBottom}
+					{@const barGap = 16}
+					{@const barW = (plotW - barGap * (revData.length + 1)) / revData.length}
+					<div class="relative">
+						<svg
+							viewBox="0 0 {svgW} {svgH}"
+							class="w-full"
+							role="img"
+							aria-label="Monthly revenue bar chart"
+						>
+							<defs>
+								<linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+									<stop offset="0%" stop-color="#3b82f6" />
+									<stop offset="100%" stop-color="#1d4ed8" />
+								</linearGradient>
+								<filter id="barShadow" x="-5%" y="-5%" width="110%" height="115%">
+									<feDropShadow
+										dx="0"
+										dy="2"
+										stdDeviation="3"
+										flood-color="#2563eb"
+										flood-opacity="0.18"
+									/>
+								</filter>
+							</defs>
+
+							{#each Array(gridLines + 1) as _, gi}
+								{@const yVal = chartTop + (plotH / gridLines) * gi}
+								{@const labelVal = niceMax - (niceMax / gridLines) * gi}
+								<line
+									x1={chartLeft}
+									y1={yVal}
+									x2={svgW - chartRight}
+									y2={yVal}
+									stroke="#e5e7eb"
+									stroke-width="1"
+									stroke-dasharray={gi === gridLines ? '0' : '4 3'}
+								/>
+								<text
+									x={chartLeft - 8}
+									y={yVal + 4}
+									text-anchor="end"
+									fill="#9ca3af"
+									font-size="11"
+								>
+									{formatPrice(labelVal)}
+								</text>
+							{/each}
+
+							{#each revData as month, i}
+								{@const barH = Math.max((month.revenue / niceMax) * plotH, 0)}
+								{@const x = chartLeft + barGap + i * (barW + barGap)}
+								{@const y = chartTop + plotH - barH}
+
+								{#if barH > 0}
+									<rect
+										{x}
+										{y}
+										width={barW}
+										height={barH}
+										fill="url(#barGrad)"
+										rx="6"
+										ry="6"
+										filter="url(#barShadow)"
+									>
+										<title>{month.label}: {formatPrice(month.revenue)}</title>
+									</rect>
+								{:else}
+									<rect
+										{x}
+										y={chartTop + plotH - 3}
+										width={barW}
+										height="3"
+										fill="#e5e7eb"
+										rx="2"
+									/>
+								{/if}
+
+								<text
+									x={x + barW / 2}
+									y={y - 8}
+									text-anchor="middle"
+									fill="#1e3a5f"
+									font-size="12"
+									font-weight="700"
+								>
+									{formatPrice(month.revenue)}
+								</text>
+
+								<text
+									x={x + barW / 2}
+									y={chartTop + plotH + 24}
+									text-anchor="middle"
+									fill="#6b7280"
+									font-size="12"
+									font-weight="500"
+								>
+									{month.shortLabel}
+								</text>
+							{/each}
+						</svg>
+					</div>
 				{/if}
 			</div>
 

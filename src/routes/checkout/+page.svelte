@@ -7,7 +7,7 @@
 	import { formatPrice } from '$lib/utils/index';
 	import { getProductImage } from '$lib/stores/products';
 	import { toasts } from '$lib/stores/toast';
-	import { pb, type OrderItem, type ShippingAddress } from '$lib/pocketbase';
+	import { pb, type OrderItem, type ShippingAddress, type Product } from '$lib/pocketbase';
 
 	let isProcessing = $state(false);
 	let orderId = $state('');
@@ -66,7 +66,9 @@
 			productName: item.product.name,
 			productImage: getProductImage(item.product),
 			price: item.product.price,
-			quantity: item.quantity
+			quantity: item.quantity,
+			color: item.color || '',
+			size: item.size || ''
 		}));
 
 		const shippingAddress: ShippingAddress = {
@@ -82,6 +84,30 @@
 
 		if (browser) {
 			try {
+				const stockEntries: Record<string, { qty: number; fresh: Product }> = {};
+				for (const item of $cart) {
+					const existing = stockEntries[item.product.id];
+					const totalQty = (existing?.qty || 0) + item.quantity;
+					if (existing) {
+						existing.qty = totalQty;
+					} else {
+						const fresh = await pb.collection('estore_products').getOne<Product>(item.product.id);
+						stockEntries[item.product.id] = { qty: totalQty, fresh };
+					}
+				}
+
+				for (const pid of Object.keys(stockEntries)) {
+					const entry = stockEntries[pid];
+					if (entry.qty > entry.fresh.stock) {
+						toasts.show(
+							'error',
+							`Not enough stock for "${entry.fresh.name}". Only ${entry.fresh.stock} available.`
+						);
+						isProcessing = false;
+						return;
+					}
+				}
+
 				const record = await pb.collection('estore_orders').create({
 					items: JSON.stringify(items),
 					total: $cartTotal,
@@ -94,11 +120,18 @@
 				});
 				orderId = record.id;
 
+				for (const pid of Object.keys(stockEntries)) {
+					const entry = stockEntries[pid];
+					const fresh = await pb.collection('estore_products').getOne<Product>(pid);
+					const newStock = Math.max(0, fresh.stock - entry.qty);
+					await pb.collection('estore_products').update(pid, { stock: newStock });
+				}
+
 				const existing = localStorage.getItem('luxe_orders');
 				const orders = existing ? JSON.parse(existing) : [];
 				orders.push({ ...record, shippingAddress, items });
 				localStorage.setItem('luxe_orders', JSON.stringify(orders));
-			} catch (e: any) {
+			} catch (_e: unknown) {
 				toasts.show('error', 'Failed to place order. Please try again.');
 				isProcessing = false;
 				return;
@@ -306,7 +339,7 @@
 						<h2 class="mb-6 text-xl font-semibold text-text-primary">Order Summary</h2>
 
 						<div class="mb-6 max-h-60 space-y-4 overflow-y-auto">
-							{#each $cart as item}
+							{#each $cart as item (`${item.product.id}-${item.color}-${item.size}`)}
 								<div class="flex gap-4">
 									<div class="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-bg-secondary">
 										<img
@@ -318,6 +351,17 @@
 									<div class="flex-1">
 										<p class="text-sm font-medium">{item.product.name}</p>
 										<p class="text-sm text-text-muted">Qty: {item.quantity}</p>
+										<div class="flex gap-1">
+											{#if item.color}
+												<span class="text-xs text-text-muted">{item.color}</span>
+											{/if}
+											{#if item.color && item.size}
+												<span class="text-xs text-text-muted">/</span>
+											{/if}
+											{#if item.size}
+												<span class="text-xs text-text-muted">{item.size}</span>
+											{/if}
+										</div>
 									</div>
 									<p class="font-semibold">{formatPrice(item.product.price * item.quantity)}</p>
 								</div>

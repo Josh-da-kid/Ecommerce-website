@@ -7,7 +7,7 @@
 		fetchCategories,
 		getProductImage
 	} from '$lib/stores/products';
-	import { pb, parseImages, type Product } from '$lib/pocketbase';
+	import { pb, parseImages, getImageUrl, getProductImages, type Product } from '$lib/pocketbase';
 	import { formatPrice, slugify } from '$lib/utils/index';
 	import { Button, Input, Modal } from '$lib/components/ui';
 	import { toasts } from '$lib/stores/toast';
@@ -31,8 +31,19 @@
 		sku: '',
 		featured: false,
 		category: '',
-		images: ''
+		colors: '',
+		sizes: ''
 	});
+
+	let newImages = $state<File[]>([]);
+	let existingFilenames = $state<string[]>([]);
+	let imageUrlInput = $state('');
+	let isFetchingUrl = $state(false);
+
+	const MAX_IMAGES = 10;
+
+	let totalImageCount = $derived(existingFilenames.length + newImages.length);
+	let canAddMore = $derived(totalImageCount < MAX_IMAGES);
 
 	let errors = $derived({
 		name: !form.name.trim() ? 'Product name is required' : '',
@@ -60,8 +71,12 @@
 			sku: '',
 			featured: false,
 			category: '',
-			images: ''
+			colors: '',
+			sizes: ''
 		};
+		newImages = [];
+		existingFilenames = [];
+		imageUrlInput = '';
 		editingProduct = null;
 		submitted = false;
 	}
@@ -83,9 +98,78 @@
 			sku: product.sku || '',
 			featured: product.featured || false,
 			category: product.category || '',
-			images: parseImages(product.images).join(', ')
+			colors: Array.isArray(product.colors) ? product.colors.join(', ') : '',
+			sizes: Array.isArray(product.sizes) ? product.sizes.join(', ') : ''
 		};
+		existingFilenames = parseImages(product.images);
+		newImages = [];
 		showModal = true;
+	}
+
+	function handleFileInput(e: Event) {
+		const input = e.target as HTMLInputElement;
+		if (input.files) {
+			const remaining = MAX_IMAGES - totalImageCount;
+			const toAdd = Array.from(input.files).slice(0, remaining);
+			newImages = [...newImages, ...toAdd];
+			if (Array.from(input.files).length > toAdd.length) {
+				toasts.show('warning', `Only ${toAdd.length} image(s) added. Maximum is ${MAX_IMAGES}.`);
+			}
+		}
+		input.value = '';
+	}
+
+	function removeNewImage(index: number) {
+		newImages = newImages.filter((_, i) => i !== index);
+	}
+
+	function removeExistingImage(index: number) {
+		existingFilenames = existingFilenames.filter((_, i) => i !== index);
+	}
+
+	async function addImageUrl() {
+		const url = imageUrlInput.trim();
+		if (!url) return;
+
+		if (!canAddMore) {
+			toasts.show('error', `Maximum ${MAX_IMAGES} images allowed.`);
+			return;
+		}
+
+		isFetchingUrl = true;
+		try {
+			const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
+			const res = await fetch(proxyUrl);
+			if (!res.ok) {
+				let msg = `Failed to fetch image (${res.status})`;
+				try {
+					const body = await res.json();
+					msg = body.message || body.error || msg;
+				} catch {}
+				toasts.show('error', msg);
+				isFetchingUrl = false;
+				return;
+			}
+
+			const blob = await res.blob();
+
+			if (!blob.type.startsWith('image/')) {
+				toasts.show('error', 'URL did not return an image');
+				isFetchingUrl = false;
+				return;
+			}
+
+			const ext = blob.type.split('/')[1] || 'jpg';
+			const filename = `image_${Date.now()}.${ext}`;
+			const file = new File([blob], filename, { type: blob.type });
+			newImages = [...newImages, file];
+			imageUrlInput = '';
+			toasts.show('success', 'Image added from URL');
+		} catch (_e: unknown) {
+			toasts.show('error', 'Network error reaching the proxy. Try restarting the dev server.');
+		} finally {
+			isFetchingUrl = false;
+		}
 	}
 
 	function handleNameInput() {
@@ -98,29 +182,104 @@
 
 		saving = true;
 		try {
-			const imagesArray = form.images
+			const colorsArray = form.colors
 				.split(',')
 				.map((s) => s.trim())
 				.filter(Boolean);
 
-			const data = {
-				name: form.name,
-				slug: form.slug,
-				description: form.description,
-				price: Number(form.price),
-				comparePrice: Number(form.comparePrice) || 0,
-				stock: Number(form.stock),
-				sku: form.sku,
-				featured: form.featured,
-				category: form.category,
-				images: imagesArray.join(',')
-			};
+			const sizesArray = form.sizes
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean);
 
 			if (editingProduct) {
-				await pb.collection('estore_products').update(editingProduct.id, data);
+				const pbFilenames = existingFilenames.filter((f) => !f.startsWith('http'));
+				const urlFilenames = existingFilenames.filter((f) => f.startsWith('http'));
+
+				let allNewFiles = [...newImages];
+
+				for (const url of urlFilenames) {
+					try {
+						const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
+						const res = await fetch(proxyUrl);
+						if (res.ok) {
+							const blob = await res.blob();
+							const ext = blob.type.split('/')[1] || 'jpg';
+							const file = new File([blob], `image_${Date.now()}.${ext}`, {
+								type: blob.type
+							});
+							allNewFiles.push(file);
+						}
+					} catch {}
+				}
+
+				const originalFilenames = parseImages(editingProduct.images);
+				const hasChanges =
+					allNewFiles.length > 0 ||
+					pbFilenames.length !== originalFilenames.length ||
+					pbFilenames.some((f, i) => f !== originalFilenames[i]);
+
+				if (hasChanges) {
+					const formData = new FormData();
+					formData.append('name', form.name);
+					formData.append('slug', form.slug);
+					formData.append('description', form.description);
+					formData.append('price', String(Number(form.price)));
+					formData.append('comparePrice', String(Number(form.comparePrice) || 0));
+					formData.append('stock', String(Number(form.stock)));
+					formData.append('sku', form.sku);
+					formData.append('featured', String(form.featured));
+					formData.append('category', form.category);
+					formData.append('colors', JSON.stringify(colorsArray));
+					formData.append('sizes', JSON.stringify(sizesArray));
+
+					if (pbFilenames.length > 0) {
+						formData.append('images', JSON.stringify(pbFilenames));
+					}
+
+					for (const file of allNewFiles) {
+						formData.append('images', file);
+					}
+
+					await pb.collection('estore_products').update(editingProduct.id, formData);
+				} else {
+					const data: Record<string, unknown> = {
+						name: form.name,
+						slug: form.slug,
+						description: form.description,
+						price: Number(form.price),
+						comparePrice: Number(form.comparePrice) || 0,
+						stock: Number(form.stock),
+						sku: form.sku,
+						featured: form.featured,
+						category: form.category,
+						colors: colorsArray,
+						sizes: sizesArray
+					};
+
+					await pb.collection('estore_products').update(editingProduct.id, data);
+				}
+
 				toasts.show('success', 'Product updated successfully');
 			} else {
-				await pb.collection('estore_products').create(data);
+				const formData = new FormData();
+				formData.append('name', form.name);
+				formData.append('slug', form.slug);
+				formData.append('description', form.description);
+				formData.append('price', String(Number(form.price)));
+				formData.append('comparePrice', String(Number(form.comparePrice) || 0));
+				formData.append('stock', String(Number(form.stock)));
+				formData.append('sku', form.sku);
+				formData.append('featured', String(form.featured));
+				formData.append('category', form.category);
+				formData.append('colors', JSON.stringify(colorsArray));
+				formData.append('sizes', JSON.stringify(sizesArray));
+
+				for (const file of newImages) {
+					formData.append('images', file);
+				}
+
+				await pb.collection('estore_products').create(formData);
 				toasts.show('success', 'Product created successfully');
 			}
 
@@ -240,6 +399,8 @@
 							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Category</th>
 							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Price</th>
 							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Stock</th>
+							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Colors</th>
+							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Sizes</th>
 							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Featured</th>
 							<th class="px-6 py-3 text-right text-sm font-semibold text-text-primary">Actions</th>
 						</tr>
@@ -267,6 +428,34 @@
 									>{formatPrice(product.price)}</td
 								>
 								<td class="px-6 py-4 text-sm text-text-primary">{product.stock}</td>
+								<td class="px-6 py-4 text-sm text-text-secondary">
+									{#if Array.isArray(product.colors) && product.colors.length > 0}
+										<div class="flex flex-wrap gap-1">
+											{#each product.colors as color}
+												<span
+													class="inline-flex items-center rounded-full bg-bg-secondary px-2 py-0.5 text-xs"
+													>{color}</span
+												>
+											{/each}
+										</div>
+									{:else}
+										<span class="text-text-muted">-</span>
+									{/if}
+								</td>
+								<td class="px-6 py-4 text-sm text-text-secondary">
+									{#if Array.isArray(product.sizes) && product.sizes.length > 0}
+										<div class="flex flex-wrap gap-1">
+											{#each product.sizes as size}
+												<span
+													class="inline-flex items-center rounded-full bg-bg-secondary px-2 py-0.5 text-xs"
+													>{size}</span
+												>
+											{/each}
+										</div>
+									{:else}
+										<span class="text-text-muted">-</span>
+									{/if}
+								</td>
 								<td class="px-6 py-4">
 									{#if product.featured}
 										<span
@@ -408,11 +597,123 @@
 			</div>
 		</div>
 
-		<Input
-			label="Images (comma-separated URLs)"
-			placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"
-			bind:value={form.images}
-		/>
+		<div>
+			<div class="mb-2 flex items-center justify-between">
+				<label class="text-sm font-medium text-text-primary">Product Images</label>
+				<span class="text-xs {canAddMore ? 'text-text-muted' : 'font-medium text-error'}">
+					{totalImageCount} / {MAX_IMAGES} images
+				</span>
+			</div>
+
+			{#if !canAddMore}
+				<div class="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+					Maximum of {MAX_IMAGES} images reached. Remove an existing image to add more.
+				</div>
+			{/if}
+
+			{#if existingFilenames.length > 0}
+				<div class="mb-3 flex flex-wrap gap-2">
+					{#each existingFilenames as filename, i}
+						{@const src = filename.startsWith('http')
+							? filename
+							: getImageUrl('estore_products', editingProduct?.id ?? '', filename)}
+						<div class="group relative h-20 w-20 overflow-hidden rounded-lg border border-border">
+							<img {src} alt="Image {i + 1}" class="h-full w-full object-cover" />
+							<button
+								type="button"
+								class="absolute top-0 right-0 flex h-5 w-5 items-center justify-center rounded-bl-lg bg-error text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
+								onclick={() => removeExistingImage(i)}
+							>
+								&times;
+							</button>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			{#if newImages.length > 0}
+				<div class="mb-3 flex flex-wrap gap-2">
+					{#each newImages as file, i}
+						<div class="relative h-20 w-20 overflow-hidden rounded-lg border border-accent/40">
+							<img
+								src={URL.createObjectURL(file)}
+								alt="New {i + 1}"
+								class="h-full w-full object-cover"
+							/>
+							<button
+								type="button"
+								class="absolute top-0 right-0 flex h-5 w-5 items-center justify-center rounded-bl-lg bg-error text-xs text-white"
+								onclick={() => removeNewImage(i)}
+							>
+								&times;
+							</button>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			<label
+				class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-6 transition-colors hover:border-accent hover:bg-accent/5 {!canAddMore
+					? 'pointer-events-none opacity-40'
+					: ''}"
+			>
+				<svg
+					class="mb-2 h-8 w-8 text-text-muted"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="1.5"
+						d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+					/>
+				</svg>
+				<span class="text-sm text-text-secondary">Click to upload images</span>
+				<span class="mt-1 text-xs text-text-muted">PNG, JPG up to 10MB each</span>
+				<input
+					type="file"
+					accept="image/*"
+					multiple
+					class="hidden"
+					onchange={handleFileInput}
+					disabled={!canAddMore}
+				/>
+			</label>
+
+			<div class="mt-3 flex gap-2">
+				<input
+					type="url"
+					placeholder="Or paste an image URL..."
+					bind:value={imageUrlInput}
+					disabled={isFetchingUrl || !canAddMore}
+					class="h-12 flex-1 rounded-xl border border-border px-4 focus:border-accent focus:outline-none disabled:opacity-50"
+					onkeydown={(e) => {
+						if (e.key === 'Enter') {
+							e.preventDefault();
+							addImageUrl();
+						}
+					}}
+				/>
+				<Button variant="secondary" onclick={addImageUrl} disabled={isFetchingUrl || !canAddMore}>
+					{isFetchingUrl ? 'Fetching...' : 'Add URL'}
+				</Button>
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+			<Input
+				label="Available Colors (comma-separated)"
+				placeholder="e.g. Red, Blue, Black"
+				bind:value={form.colors}
+			/>
+			<Input
+				label="Available Sizes (comma-separated)"
+				placeholder="e.g. S, M, L, XL"
+				bind:value={form.sizes}
+			/>
+		</div>
 
 		<div class="flex items-center gap-3">
 			<input

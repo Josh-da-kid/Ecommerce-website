@@ -3,75 +3,115 @@ import { browser } from '$app/environment';
 import type { Product } from '$lib/pocketbase';
 
 export interface CartItem {
-  product: Product;
-  quantity: number;
+	product: Product;
+	quantity: number;
+	color: string;
+	size: string;
 }
 
 const CART_KEY = 'luxe_cart';
 
+function getItemKey(productId: string, color: string, size: string) {
+	return `${productId}__${color}__${size}`;
+}
+
 function createCart() {
-  const stored = browser ? localStorage.getItem(CART_KEY) : null;
-  const initial: CartItem[] = stored ? JSON.parse(stored) : [];
+	const stored = browser ? localStorage.getItem(CART_KEY) : null;
+	const initial: CartItem[] = stored ? JSON.parse(stored) : [];
 
-  const { subscribe, set, update } = writable<CartItem[]>(initial);
+	const { subscribe, set, update } = writable<CartItem[]>(initial);
 
-  if (browser) {
-    subscribe(value => {
-      localStorage.setItem(CART_KEY, JSON.stringify(value));
-    });
-  }
+	if (browser) {
+		subscribe((value) => {
+			localStorage.setItem(CART_KEY, JSON.stringify(value));
+		});
+	}
 
-  return {
-    subscribe,
-    addItem: (product: Product, quantity: number = 1) => {
-      update(items => {
-        const existing = items.find(item => item.product.id === product.id);
-        if (existing) {
-          return items.map(item =>
-            item.product.id === product.id
-              ? { ...item, quantity: item.quantity + quantity }
-              : item
-          );
-        }
-        return [...items, { product, quantity }];
-      });
-    },
-    removeItem: (productId: string) => {
-      update(items => items.filter(item => item.product.id !== productId));
-    },
-    updateQuantity: (productId: string, quantity: number) => {
-      if (quantity <= 0) {
-        update(items => items.filter(item => item.product.id !== productId));
-      } else {
-        update(items =>
-          items.map(item =>
-            item.product.id === productId ? { ...item, quantity } : item
-          )
-        );
-      }
-    },
-    clear: () => set([]),
-    load: (items: CartItem[]) => set(items)
-  };
+	return {
+		subscribe,
+		addItem: (product: Product, quantity: number = 1, color: string = '', size: string = '') => {
+			let added = false;
+			update((items) => {
+				const key = getItemKey(product.id, color, size);
+				const existing = items.find(
+					(item) => getItemKey(item.product.id, item.color, item.size) === key
+				);
+				if (existing) {
+					const newQty = existing.quantity + quantity;
+					if (newQty > product.stock) {
+						return items;
+					}
+					return items.map((item) =>
+						getItemKey(item.product.id, item.color, item.size) === key
+							? { ...item, quantity: newQty }
+							: item
+					);
+				}
+				if (quantity > product.stock) {
+					return items;
+				}
+				added = true;
+				return [...items, { product, quantity, color, size }];
+			});
+			return added;
+		},
+		removeItem: (productId: string, color: string = '', size: string = '') => {
+			update((items) =>
+				items.filter(
+					(item) =>
+						getItemKey(item.product.id, item.color, item.size) !==
+						getItemKey(productId, color, size)
+				)
+			);
+		},
+		updateQuantity: (
+			productId: string,
+			quantity: number,
+			color: string = '',
+			size: string = ''
+		) => {
+			if (quantity <= 0) {
+				update((items) =>
+					items.filter(
+						(item) =>
+							getItemKey(item.product.id, item.color, item.size) !==
+							getItemKey(productId, color, size)
+					)
+				);
+			} else {
+				update((items) =>
+					items.map((item) =>
+						getItemKey(item.product.id, item.color, item.size) ===
+						getItemKey(productId, color, size)
+							? { ...item, quantity }
+							: item
+					)
+				);
+			}
+		},
+		clear: () => set([]),
+		load: (items: CartItem[]) => set(items)
+	};
 }
 
 export const cart = createCart();
 
-export const cartCount = derived(cart, $cart =>
-  $cart.reduce((sum, item) => sum + item.quantity, 0)
+export const cartCount = derived(cart, ($cart) =>
+	$cart.reduce((sum, item) => sum + item.quantity, 0)
 );
 
-export const cartTotal = derived(cart, $cart =>
-  $cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+export const cartTotal = derived(cart, ($cart) =>
+	$cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
 );
 
-export const cartSubtotal = derived(cart, $cart =>
-  $cart.reduce((sum, item) => {
-    const price = item.product.comparePrice || item.product.price;
-    return sum + price * item.quantity;
-  }, 0)
+export const cartSubtotal = derived(cart, ($cart) =>
+	$cart.reduce((sum, item) => {
+		const price = item.product.comparePrice || item.product.price;
+		return sum + price * item.quantity;
+	}, 0)
 );
 
-export const cartSavings = derived([cartSubtotal, cartTotal], ([$subtotal, $total]) =>
-  $subtotal - $total
+export const cartSavings = derived(
+	[cartSubtotal, cartTotal],
+	([$subtotal, $total]) => $subtotal - $total
 );

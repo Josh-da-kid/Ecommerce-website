@@ -44,6 +44,8 @@ export interface Product {
 	categoryData?: Category;
 	stock: number;
 	sku: string;
+	colors: string[];
+	sizes: string[];
 	featured: boolean;
 	created: string;
 	updated: string;
@@ -86,6 +88,8 @@ export interface OrderItem {
 	productImage: string;
 	price: number;
 	quantity: number;
+	color: string;
+	size: string;
 }
 
 export interface ShippingAddress {
@@ -111,4 +115,13 @@ export function getFirstImage(product: Product): string {
 		return getImageUrl('estore_products', product.id, img);
 	}
 	return '/placeholder-product.svg';
+}
+
+export function getProductImages(product: Product): string[] {
+	const imgs = parseImages(product.images);
+	if (imgs.length === 0) return ['/placeholder-product.svg'];
+	return imgs.map((img) => {
+		if (img.startsWith('http')) return img;
+		return getImageUrl('estore_products', product.id, img);
+	});
 }
