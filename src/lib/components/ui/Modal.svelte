@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
 	import { fade, scale } from 'svelte/transition';
+	import { browser } from '$app/environment';
 
 	interface Props {
 		open?: boolean;
@@ -29,6 +30,18 @@
 		open = false;
 		onclose?.();
 	}
+
+	$effect(() => {
+		if (!browser) return;
+		if (open) {
+			document.body.style.overflow = 'hidden';
+		} else {
+			document.body.style.overflow = '';
+		}
+		return () => {
+			document.body.style.overflow = '';
+		};
+	});
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -37,7 +50,7 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center p-4"
+		class="fixed inset-0 z-[100] flex items-center justify-center p-4"
 		transition:fade={{ duration: 200 }}
 	>
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -54,7 +67,7 @@
 		<div
 			class="relative w-full {sizeClasses[
 				size
-			]} max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-2xl"
+			]} flex max-h-[90vh] flex-col rounded-2xl bg-white shadow-2xl"
 			role="dialog"
 			aria-modal="true"
 		>
@@ -79,10 +92,7 @@
 				</div>
 			{/if}
 
-			<div
-				class="custom-scrollbar h-[80vh] overflow-y-auto p-4 sm:h-auto sm:max-h-[calc(90vh-70px)] sm:overflow-y-auto sm:p-6"
-				style="-webkit-overflow-scrolling: touch;"
-			>
+			<div class="modal-scroll flex-1 overflow-y-auto p-4 sm:p-6">
 				{#if children}
 					{@render children()}
 				{/if}
@@ -92,17 +102,18 @@
 {/if}
 
 <style>
-	.custom-scrollbar {
+	.modal-scroll {
+		-webkit-overflow-scrolling: touch;
 		scrollbar-width: thin;
 		scrollbar-color: #888 transparent;
 	}
-	.custom-scrollbar::-webkit-scrollbar {
+	.modal-scroll::-webkit-scrollbar {
 		width: 6px;
 	}
-	.custom-scrollbar::-webkit-scrollbar-track {
+	.modal-scroll::-webkit-scrollbar-track {
 		background: transparent;
 	}
-	.custom-scrollbar::-webkit-scrollbar-thumb {
+	.modal-scroll::-webkit-scrollbar-thumb {
 		background-color: #888;
 		border-radius: 3px;
 	}

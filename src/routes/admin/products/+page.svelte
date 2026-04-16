@@ -781,13 +781,13 @@
 				/>
 			</label>
 
-			<div class="mt-3 flex gap-2">
+			<div class="mt-3 flex flex-col gap-2 sm:flex-row">
 				<input
 					type="url"
 					placeholder="Or paste an image URL..."
 					bind:value={imageUrlInput}
 					disabled={isFetchingUrl || !canAddMore}
-					class="h-12 flex-1 rounded-xl border border-border px-4 focus:border-accent focus:outline-none disabled:opacity-50"
+					class="h-10 w-full rounded-xl border border-border px-3 text-sm focus:border-accent focus:outline-none disabled:opacity-50 sm:h-12 sm:px-4"
 					onkeydown={(e) => {
 						if (e.key === 'Enter') {
 							e.preventDefault();
@@ -795,7 +795,12 @@
 						}
 					}}
 				/>
-				<Button variant="secondary" onclick={addImageUrl} disabled={isFetchingUrl || !canAddMore}>
+				<Button
+					variant="secondary"
+					onclick={addImageUrl}
+					disabled={isFetchingUrl || !canAddMore}
+					class="shrink-0"
+				>
 					{isFetchingUrl ? 'Fetching...' : 'Add URL'}
 				</Button>
 			</div>
@@ -813,7 +818,7 @@
 				/>
 			</div>
 
-			<div class="flex items-center gap-3">
+			<div class="mt-4 flex items-center gap-3">
 				<input
 					type="checkbox"
 					id="featured"
