@@ -1,6 +1,7 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
 import type { Product } from '$lib/pocketbase';
+import { user } from '$lib/stores/auth';
 
 export interface CartItem {
 	product: Product;
@@ -9,21 +10,40 @@ export interface CartItem {
 	size: string;
 }
 
-const CART_KEY = 'luxe_cart';
+const CART_KEY_PREFIX = 'luxe_cart_';
+
+function getStorageKey(userId: string | undefined): string {
+	return userId ? `${CART_KEY_PREFIX}${userId}` : 'luxe_cart_guest';
+}
 
 function getItemKey(productId: string, color: string, size: string) {
 	return `${productId}__${color}__${size}`;
 }
 
 function createCart() {
-	const stored = browser ? localStorage.getItem(CART_KEY) : null;
-	const initial: CartItem[] = stored ? JSON.parse(stored) : [];
+	let currentUserId: string | undefined = undefined;
 
-	const { subscribe, set, update } = writable<CartItem[]>(initial);
+	const getStored = (): CartItem[] => {
+		if (!browser) return [];
+		const key = getStorageKey(currentUserId);
+		const stored = localStorage.getItem(key);
+		return stored ? JSON.parse(stored) : [];
+	};
+
+	const { subscribe, set, update } = writable<CartItem[]>([]);
 
 	if (browser) {
 		subscribe((value) => {
-			localStorage.setItem(CART_KEY, JSON.stringify(value));
+			const key = getStorageKey(currentUserId);
+			localStorage.setItem(key, JSON.stringify(value));
+		});
+
+		user.subscribe(($user) => {
+			const newUserId = $user?.id;
+			if (newUserId !== currentUserId) {
+				currentUserId = newUserId;
+				set(getStored());
+			}
 		});
 	}
 

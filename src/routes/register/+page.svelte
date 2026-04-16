@@ -43,7 +43,7 @@
 </script>
 
 <svelte:head>
-	<title>Register - Luxe Store</title>
+	<title>Register - Urazbox Store</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center bg-bg-primary px-4 py-24">
@@ -52,7 +52,9 @@
 			<h1 class="mb-2 text-center text-3xl font-[var(--font-playfair)] font-bold text-text-primary">
 				Create Account
 			</h1>
-			<p class="mb-8 text-center text-text-secondary">Join the Luxe circle for exclusive access</p>
+			<p class="mb-8 text-center text-text-secondary">
+				Join the Urazbox circle for exclusive access
+			</p>
 
 			<form onsubmit={handleSubmit} class="space-y-5">
 				{#if error}

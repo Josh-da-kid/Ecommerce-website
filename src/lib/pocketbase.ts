@@ -82,6 +82,9 @@ export interface Order {
 	guestEmail: string;
 	created: string;
 	updated: string;
+	expand?: {
+		user?: User;
+	};
 }
 
 export interface OrderItem {

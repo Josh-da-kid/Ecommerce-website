@@ -389,9 +389,108 @@
 			</p>
 		</div>
 	{:else}
-		<div class="overflow-hidden rounded-2xl bg-white shadow-sm">
-			<div class="overflow-x-auto">
-				<table class="w-full">
+		<!-- Mobile Card View -->
+		<div class="grid gap-3 md:hidden">
+			{#each filteredProducts as product (product.id)}
+				<div class="rounded-xl bg-white p-4 shadow-sm">
+					<div class="mb-3 flex items-start gap-3">
+						<div class="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-bg-secondary">
+							<img
+								src={getProductImage(product)}
+								alt={product.name}
+								class="h-full w-full object-cover"
+							/>
+						</div>
+						<div class="min-w-0 flex-1">
+							<p class="truncate font-medium text-text-primary">{product.name}</p>
+							<p class="text-xs text-text-muted">{product.sku}</p>
+							<p class="text-xs text-text-secondary">{getCategoryName(product.category)}</p>
+						</div>
+						{#if product.featured}
+							<span
+								class="flex-shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800"
+								>Featured</span
+							>
+						{/if}
+					</div>
+					<div class="mb-3 grid grid-cols-2 gap-2 text-sm">
+						<div>
+							<span class="text-text-muted">Price:</span>
+							<span class="ml-1 font-semibold text-accent">{formatPrice(product.price)}</span>
+						</div>
+						<div>
+							<span class="text-text-muted">Stock:</span>
+							<span class="ml-1 font-medium text-text-primary">{product.stock}</span>
+						</div>
+					</div>
+					{#if Array.isArray(product.colors) && product.colors.length > 0}
+						<div class="mb-2 flex flex-wrap gap-1">
+							{#each product.colors as color}
+								<span
+									class="inline-flex items-center rounded-full bg-bg-secondary px-2 py-0.5 text-xs text-text-secondary"
+									>{color}</span
+								>
+							{/each}
+						</div>
+					{/if}
+					{#if Array.isArray(product.sizes) && product.sizes.length > 0}
+						<div class="mb-3 flex flex-wrap gap-1">
+							{#each product.sizes as size}
+								<span
+									class="inline-flex items-center rounded-full bg-bg-secondary px-2 py-0.5 text-xs text-text-secondary"
+									>{size}</span
+								>
+							{/each}
+						</div>
+					{/if}
+					<div class="flex items-center justify-end gap-2 border-t border-border pt-3">
+						<button
+							type="button"
+							class="rounded-lg p-2 transition-colors hover:bg-bg-secondary"
+							onclick={() => openEditModal(product)}
+						>
+							<svg
+								class="h-5 w-5 text-text-muted"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+								/>
+							</svg>
+						</button>
+						<button
+							type="button"
+							class="rounded-lg p-2 transition-colors hover:bg-red-50"
+							onclick={() => deleteProduct(product.id)}
+						>
+							<svg
+								class="h-5 w-5 text-red-500"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+								/>
+							</svg>
+						</button>
+					</div>
+				</div>
+			{/each}
+		</div>
+
+		<!-- Desktop Table View -->
+		<div class="hidden overflow-hidden rounded-2xl bg-white shadow-sm md:block">
+			<div class="custom-scrollbar overflow-x-auto pb-2">
+				<table class="w-full min-w-[800px]">
 					<thead class="bg-bg-secondary">
 						<tr>
 							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Image</th>

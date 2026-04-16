@@ -1,42 +1,32 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
 	import { pb, type Order } from '$lib/pocketbase';
 	import { formatPrice } from '$lib/utils/index';
 	import { Button } from '$lib/components/ui';
+	import { isAuthenticated, user } from '$lib/stores/auth';
 
 	let orders = $state<Order[]>([]);
 	let expandedOrderId = $state<string | null>(null);
 	let loading = $state(true);
+	let currentUserId = $state<string | null>(null);
 
 	async function fetchOrders() {
 		loading = true;
 		try {
-			const stored = browser ? localStorage.getItem('luxe_orders') : null;
-			if (stored) {
-				const localOrders: Order[] = JSON.parse(stored);
-				const localIds = localOrders.map((o) => o.id);
-				const records = await pb
-					.collection('estore_orders')
-					.getFullList<Order>({ sort: '-created' });
-
-				const remoteIds = new Set(records.map((r) => r.id));
-				const missing = localOrders.filter((o) => !remoteIds.has(o.id));
-
-				orders = [...records, ...missing].sort(
-					(a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
-				);
-			} else {
-				orders = await pb.collection('estore_orders').getFullList<Order>({ sort: '-created' });
-			}
+			const filter = currentUserId ? `user.id="${currentUserId}"` : '';
+			orders = await pb
+				.collection('estore_orders')
+				.getFullList<Order>({ sort: '-created', filter, expand: 'user' });
 		} catch {
 			if (browser) {
 				try {
 					const stored = localStorage.getItem('luxe_orders');
 					if (stored) {
-						orders = (JSON.parse(stored) as Order[]).sort(
-							(a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
-						);
+						orders = (JSON.parse(stored) as Order[])
+							.filter((o) => !currentUserId || o.user === currentUserId)
+							.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
 					}
 				} catch {}
 			}
@@ -46,11 +36,19 @@
 	}
 
 	onMount(() => {
+		if (!$isAuthenticated) {
+			goto('/login');
+			return;
+		}
+		currentUserId = $user?.id ?? null;
 		fetchOrders();
 
 		pb.collection('estore_orders').subscribe('*', (e) => {
 			if (e.action === 'create') {
-				orders = [e.record as unknown as Order, ...orders];
+				const newOrder = e.record as unknown as Order;
+				if (!currentUserId || newOrder.user === currentUserId) {
+					orders = [newOrder, ...orders];
+				}
 			} else if (e.action === 'update') {
 				orders = orders.map((o) => (o.id === e.record.id ? (e.record as unknown as Order) : o));
 			} else if (e.action === 'delete') {

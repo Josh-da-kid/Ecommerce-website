@@ -13,29 +13,19 @@
 
 	async function fetchOrders() {
 		try {
-			const stored = browser ? localStorage.getItem('luxe_orders') : null;
-			if (stored) {
-				const localOrders: Order[] = JSON.parse(stored);
-				const localIds = localOrders.map((o) => o.id);
-				const records = await pb
-					.collection('estore_orders')
-					.getFullList<Order>({ sort: '-created' });
-
-				const remoteIds = new Set(records.map((r) => r.id));
-				const missing = localOrders.filter((o) => !remoteIds.has(o.id));
-
-				orders = [...records, ...missing].sort(
-					(a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
-				);
-			} else {
-				orders = await pb.collection('estore_orders').getFullList<Order>({ sort: '-created' });
-			}
+			const userId = $user?.id;
+			const filter = userId ? `user.id="${userId}"` : '';
+			orders = await pb
+				.collection('estore_orders')
+				.getFullList<Order>({ sort: '-created', filter, expand: 'user' });
 		} catch {
 			if (browser) {
 				try {
 					const stored = localStorage.getItem('luxe_orders');
 					if (stored) {
-						orders = JSON.parse(stored);
+						const allOrders: Order[] = JSON.parse(stored);
+						const userId = $user?.id;
+						orders = userId ? allOrders.filter((o) => o.user === userId) : allOrders;
 					}
 				} catch {}
 			}
@@ -82,7 +72,7 @@
 </script>
 
 <svelte:head>
-	<title>My Account - Luxe Store</title>
+	<title>My Account - Urazbox Store</title>
 </svelte:head>
 
 {#if loaded && $isAuthenticated && $user}

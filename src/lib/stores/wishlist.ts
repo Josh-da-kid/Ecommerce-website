@@ -1,18 +1,40 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
 import type { Product } from '$lib/pocketbase';
+import { user } from '$lib/stores/auth';
 
-const WISHLIST_KEY = 'luxe_wishlist';
+const WISHLIST_KEY_PREFIX = 'luxe_wishlist_';
+
+function getStorageKey(userId: string | undefined): string {
+	return userId ? `${WISHLIST_KEY_PREFIX}${userId}` : 'luxe_wishlist_guest';
+}
 
 function createWishlist() {
-	const stored = browser ? localStorage.getItem(WISHLIST_KEY) : null;
-	const initial: string[] = stored ? JSON.parse(stored) : [];
+	let currentUserId: string | undefined = undefined;
 
-	const { subscribe, set, update } = writable<string[]>(initial);
+	const getStored = (): string[] => {
+		if (!browser) return [];
+		const key = getStorageKey(currentUserId);
+		const stored = localStorage.getItem(key);
+		return stored ? JSON.parse(stored) : [];
+	};
+
+	const { subscribe, set, update } = writable<string[]>([]);
 
 	if (browser) {
 		subscribe((value) => {
-			localStorage.setItem(WISHLIST_KEY, JSON.stringify(value));
+			const key = getStorageKey(currentUserId);
+			localStorage.setItem(key, JSON.stringify(value));
+		});
+	}
+
+	if (browser) {
+		user.subscribe(($user) => {
+			const newUserId = $user?.id;
+			if (newUserId !== currentUserId) {
+				currentUserId = newUserId;
+				set(getStored());
+			}
 		});
 	}
 

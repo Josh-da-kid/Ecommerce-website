@@ -1,9 +1,12 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { wishlist } from '$lib/stores';
 	import { products } from '$lib/stores/products';
 	import { ProductCard } from '$lib/components/product';
 	import { Button } from '$lib/components/ui';
 	import type { Product } from '$lib/pocketbase';
+	import { isAuthenticated } from '$lib/stores/auth';
+	import { goto } from '$app/navigation';
 
 	let wishlistValue = $state<string[]>([]);
 	wishlist.subscribe((v) => (wishlistValue = v));
@@ -16,6 +19,12 @@
 			(p, i, arr) => wishlistValue.includes(p.id) && arr.findIndex((x) => x.id === p.id) === i
 		)
 	);
+
+	onMount(() => {
+		if (!$isAuthenticated) {
+			goto('/login');
+		}
+	});
 </script>
 
 <svelte:head>

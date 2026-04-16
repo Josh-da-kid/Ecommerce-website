@@ -12,7 +12,6 @@
 
 	function checkAuth() {
 		if (!get(authInitialized)) return false;
-		loading = false;
 		if (!get(isAuthenticated)) {
 			goto('/login');
 		} else if (!get(isAdmin)) {
@@ -22,12 +21,22 @@
 	}
 
 	onMount(() => {
+		const timeout = setTimeout(() => {
+			loading = false;
+		}, 500);
+
 		if (!checkAuth()) {
-			const unsub = authInitialized.subscribe(() => {
-				checkAuth();
+			const unsub = authInitialized.subscribe((initialized) => {
+				if (initialized) {
+					checkAuth();
+					clearTimeout(timeout);
+				}
 			});
 			return unsub;
 		}
+
+		loading = false;
+		return () => clearTimeout(timeout);
 	});
 
 	const navItems = [
@@ -79,7 +88,7 @@
 		</div>
 	</div>
 {:else}
-	<div class="flex min-h-screen bg-bg-secondary">
+	<div class="flex min-h-screen overflow-x-hidden bg-bg-secondary">
 		{#if sidebarOpen}
 			<div
 				class="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -94,7 +103,7 @@
 		<aside
 			class="fixed inset-y-0 left-0 z-50 w-64 flex-shrink-0 bg-primary text-white transition-transform duration-300 {sidebarOpen
 				? 'translate-x-0'
-				: '-translate-x-full'}"
+				: '-translate-x-full'} lg:translate-x-0"
 		>
 			<div class="flex items-center justify-between p-6">
 				<a href="/admin" class="text-2xl font-[var(--font-playfair)] font-bold">Admin</a>
@@ -165,11 +174,13 @@
 			</div>
 		</aside>
 
-		<div class="flex-1">
-			<header class="flex items-center justify-between bg-white px-6 py-4 shadow-sm">
+		<div class="min-w-0 flex-1">
+			<header
+				class="flex items-center justify-between bg-white px-4 py-3 shadow-sm sm:px-6 sm:py-4"
+			>
 				<div class="flex items-center gap-3">
 					<button
-						class="rounded-lg p-2 hover:bg-bg-secondary"
+						class="rounded-lg p-2 hover:bg-bg-secondary lg:hidden"
 						onclick={() => (sidebarOpen = !sidebarOpen)}
 						aria-label="Toggle sidebar"
 					>
@@ -194,22 +205,46 @@
 						{/if}
 					</button>
 
-					<h1 class="text-xl font-semibold text-text-primary">
+					<h1 class="text-lg font-semibold text-text-primary sm:text-xl">
 						{navItems.find((n) => n.href === $page.url.pathname)?.label || 'Admin'}
 					</h1>
 				</div>
 
-				<div class="flex items-center gap-4">
-					<span class="text-sm text-text-secondary">Admin</span>
+				<div class="flex items-center gap-3 sm:gap-4">
+					<span class="hidden text-sm text-text-secondary sm:inline">Admin</span>
 					<div
-						class="flex h-10 w-10 items-center justify-center rounded-full bg-accent font-semibold text-white"
+						class="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white sm:h-10 sm:w-10"
 					>
 						A
 					</div>
 				</div>
 			</header>
 
-			<main class="p-6">
+			<nav class="border-b border-border bg-white lg:hidden">
+				<div class="grid grid-cols-3 gap-1 px-3 py-2">
+					{#each navItems as item}
+						<a
+							href={item.href}
+							class="flex items-center justify-center gap-2 rounded-lg px-2 py-2.5 text-sm font-medium transition-colors {$page
+								.url.pathname === item.href
+								? 'bg-accent text-white'
+								: 'text-text-secondary hover:bg-bg-secondary'}"
+						>
+							<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d={item.icon}
+								/>
+							</svg>
+							<span>{item.label}</span>
+						</a>
+					{/each}
+				</div>
+			</nav>
+
+			<main class="p-4 sm:p-6">
 				{@render children()}
 			</main>
 		</div>

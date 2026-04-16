@@ -99,6 +99,33 @@
 		animation: slideInRight 0.3s ease-out forwards;
 	}
 
+	.scrollbar-hide {
+		-ms-overflow-style: none;
+		scrollbar-width: none;
+	}
+	.scrollbar-hide::-webkit-scrollbar {
+		display: none;
+	}
+
+	.custom-scrollbar {
+		scrollbar-width: thin;
+		scrollbar-color: var(--color-accent) transparent;
+	}
+	.custom-scrollbar::-webkit-scrollbar {
+		height: 4px;
+	}
+	.custom-scrollbar::-webkit-scrollbar-track {
+		background: transparent;
+		border-radius: 9999px;
+	}
+	.custom-scrollbar::-webkit-scrollbar-thumb {
+		background: var(--color-accent);
+		border-radius: 9999px;
+	}
+	.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+		background: var(--color-accent-hover);
+	}
+
 	.stagger-1 {
 		animation-delay: 0.1s;
 	}

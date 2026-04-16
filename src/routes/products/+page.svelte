@@ -55,7 +55,7 @@
 </script>
 
 <svelte:head>
-	<title>Shop - Luxe Store</title>
+	<title>Shop - Urazbox Store</title>
 </svelte:head>
 
 <div class="min-h-screen bg-bg-primary pt-24 pb-16">

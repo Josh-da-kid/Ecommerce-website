@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { cartCount, wishlistCount, isAuthenticated, isAdmin } from '$lib/stores';
+	import { cartCount, wishlistCount, isAuthenticated, isAdmin, user } from '$lib/stores';
 	import { goto } from '$app/navigation';
 	import { fade, fly } from 'svelte/transition';
 
@@ -25,11 +25,15 @@
 	const navLinks = [
 		{ href: '/', label: 'Home' },
 		{ href: '/products', label: 'Shop' },
+		{ href: '/contact', label: 'Contact Us' }
+	];
+
+	let authLinks = $derived([
 		{ href: '/orders', label: 'Orders' },
 		{ href: '/orders/history', label: 'Order History' },
 		{ href: '/wishlist', label: 'Wishlist' },
 		{ href: '/account', label: 'Account' }
-	];
+	]);
 </script>
 
 <header
@@ -62,7 +66,7 @@
 				<span
 					class="text-2xl font-[var(--font-playfair)] font-bold transition-colors duration-300 {darkText
 						? 'text-primary'
-						: 'text-white'}">LUXE</span
+						: 'text-white'}">URAZBOX</span
 				>
 			</a>
 
@@ -305,13 +309,6 @@
 			transition:fly={{ y: -10, duration: 200 }}
 		>
 			<nav class="flex flex-col gap-2">
-				<a
-					href="/contact"
-					class="rounded-xl px-4 py-3 text-text-primary transition-colors hover:bg-bg-secondary"
-					onclick={() => (mobileMenuOpen = false)}
-				>
-					Contact Us
-				</a>
 				{#each navLinks as link}
 					<a
 						href={link.href}
@@ -321,12 +318,21 @@
 						{link.label}
 					</a>
 				{/each}
-				<hr class="my-2 border-border" />
 				{#if $isAuthenticated}
+					{#each authLinks as link}
+						<a
+							href={link.href}
+							class="rounded-xl px-4 py-3 text-text-primary transition-colors hover:bg-bg-secondary"
+							onclick={() => (mobileMenuOpen = false)}
+						>
+							{link.label}
+						</a>
+					{/each}
+					<hr class="my-2 border-border" />
 					{#if $isAdmin}
 						<a
 							href="/admin"
-							class="rounded-xl px-4 py-3 text-text-primary transition-colors hover:bg-bg-secondary"
+							class="rounded-xl px-4 py-3 font-medium text-accent transition-colors hover:bg-accent/10"
 							onclick={() => (mobileMenuOpen = false)}
 						>
 							Admin Dashboard
@@ -340,6 +346,7 @@
 						My Account
 					</a>
 				{:else}
+					<hr class="my-2 border-border" />
 					<a
 						href="/login"
 						class="rounded-xl px-4 py-3 text-text-primary transition-colors hover:bg-bg-secondary"
@@ -400,13 +407,6 @@
 			<!-- Drawer nav links -->
 			<nav class="flex-1 overflow-y-auto p-4">
 				<div class="flex flex-col gap-2">
-					<a
-						href="/contact"
-						class="rounded-xl px-4 py-3 text-text-primary transition-colors hover:bg-bg-secondary"
-						onclick={() => (drawerOpen = false)}
-					>
-						Contact Us
-					</a>
 					{#each navLinks as link}
 						<a
 							href={link.href}
@@ -416,6 +416,17 @@
 							{link.label}
 						</a>
 					{/each}
+					{#if $isAuthenticated}
+						{#each authLinks as link}
+							<a
+								href={link.href}
+								class="rounded-xl px-4 py-3 text-text-primary transition-colors hover:bg-bg-secondary"
+								onclick={() => (drawerOpen = false)}
+							>
+								{link.label}
+							</a>
+						{/each}
+					{/if}
 				</div>
 
 				<hr class="my-4 border-border" />
@@ -424,7 +435,7 @@
 					{#if $isAdmin}
 						<a
 							href="/admin"
-							class="rounded-xl px-4 py-3 text-text-primary transition-colors hover:bg-bg-secondary"
+							class="rounded-xl px-4 py-3 font-medium text-accent transition-colors hover:bg-accent/10"
 							onclick={() => (drawerOpen = false)}
 						>
 							Admin Dashboard

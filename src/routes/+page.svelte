@@ -180,7 +180,7 @@
 		<div class="grid grid-cols-1 items-center gap-16 lg:grid-cols-2">
 			<div>
 				<h2 class="mb-6 text-4xl font-[var(--font-playfair)] font-bold md:text-5xl">
-					Join the Luxe Circle
+					Join the Urazbox Circle
 				</h2>
 				<p class="mb-8 text-xl text-gray-300">
 					Subscribe to our newsletter for exclusive offers, early access to new collections, and

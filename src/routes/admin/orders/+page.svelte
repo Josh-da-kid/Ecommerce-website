@@ -28,7 +28,9 @@
 		loading = true;
 		error = '';
 		try {
-			orders = await pb.collection('estore_orders').getFullList<Order>({ sort: '-created' });
+			orders = await pb
+				.collection('estore_orders')
+				.getFullList<Order>({ sort: '-created', expand: 'user' });
 		} catch (e: any) {
 			error = e.message || 'Failed to load orders';
 		} finally {
@@ -110,7 +112,7 @@
 		</div>
 	{/if}
 
-	<div class="mb-6 flex flex-wrap gap-2">
+	<div class="custom-scrollbar mb-6 flex gap-2 overflow-x-auto pb-2">
 		{#each statuses as status}
 			<button
 				onclick={() => (activeFilter = status)}
@@ -156,21 +158,101 @@
 			</p>
 		</div>
 	{:else}
-		<div class="overflow-hidden rounded-2xl bg-white shadow-sm">
-			<div class="overflow-x-auto">
-				<table class="w-full">
+		<!-- Mobile Card View -->
+		<div class="grid gap-4 md:hidden">
+			{#each filteredOrders as order (order.id)}
+				<div class="rounded-xl bg-white p-4 shadow-sm">
+					<div class="mb-3 flex items-center justify-between">
+						<span class="font-mono text-sm font-medium text-accent">#{order.id.slice(0, 8)}</span>
+						<span
+							class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold capitalize {statusColors[
+								order.status
+							] || 'bg-gray-100 text-gray-800'}">{order.status}</span
+						>
+					</div>
+					<div class="space-y-2 text-sm">
+						<div class="flex justify-between">
+							<span class="text-text-muted">Customer:</span>
+							<span class="text-text-primary">{order.shippingAddress?.name || 'N/A'}</span>
+						</div>
+						<div class="flex justify-between">
+							<span class="text-text-muted">Email:</span>
+							<span class="text-text-secondary"
+								>{order.shippingAddress?.email || order.guestEmail || 'N/A'}</span
+							>
+						</div>
+						<div class="flex justify-between">
+							<span class="text-text-muted">Date:</span>
+							<span class="text-text-secondary"
+								>{new Date(order.created).toLocaleDateString('en-US', {
+									month: 'short',
+									day: 'numeric',
+									year: 'numeric'
+								})}</span
+							>
+						</div>
+						<div class="flex justify-between">
+							<span class="text-text-muted">Total:</span>
+							<span class="font-semibold text-accent">{formatPrice(order.total)}</span>
+						</div>
+					</div>
+					<button
+						class="mt-3 w-full rounded-lg border border-border py-2 text-sm font-medium text-text-primary hover:bg-bg-secondary"
+						onclick={() => toggleExpand(order.id)}
+					>
+						{expandedOrderId === order.id ? 'Hide Details' : 'View Details'}
+					</button>
+					{#if expandedOrderId === order.id}
+						<div class="mt-4 space-y-2 border-t border-border pt-4">
+							<h4 class="font-semibold text-text-primary">Order Items</h4>
+							{#each order.items as item}
+								<div class="flex items-center gap-3 rounded-lg bg-bg-secondary p-2">
+									<img
+										src={item.productImage?.startsWith('http')
+											? item.productImage
+											: '/placeholder-product.svg'}
+										alt={item.productName}
+										class="h-10 w-10 rounded object-cover"
+									/>
+									<div class="flex-1">
+										<p class="text-sm font-medium text-text-primary">{item.productName}</p>
+										<p class="text-xs text-text-muted">
+											Qty: {item.quantity} × {formatPrice(item.price)}
+										</p>
+									</div>
+								</div>
+							{/each}
+							<div class="mt-3 flex items-center justify-between border-t border-border pt-3">
+								<label class="text-sm font-medium text-text-primary">Update Status:</label>
+								<select
+									class="rounded-lg border border-border px-3 py-1 text-sm"
+									value={order.status}
+									onchange={(e) => updateStatus(order.id, (e.target as HTMLSelectElement).value)}
+									disabled={updatingStatus === order.id}
+								>
+									{#each statuses.filter((s) => s !== 'all') as status}
+										<option value={status}>{status}</option>
+									{/each}
+								</select>
+							</div>
+						</div>
+					{/if}
+				</div>
+			{/each}
+		</div>
+
+		<!-- Desktop Table View -->
+		<div class="hidden md:block md:overflow-hidden md:rounded-2xl md:bg-white md:shadow-sm">
+			<div class="custom-scrollbar overflow-x-auto pb-2">
+				<table class="w-full min-w-[700px]">
 					<thead class="bg-bg-secondary">
 						<tr>
-							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">
-								Order ID
-							</th>
-							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">
-								Customer
-							</th>
-							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary"> Email </th>
-							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary"> Date </th>
-							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary"> Total </th>
-							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary"> Status </th>
+							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Order ID</th>
+							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Customer</th>
+							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Email</th>
+							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Date</th>
+							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Total</th>
+							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Status</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-border">
@@ -179,36 +261,34 @@
 								class="cursor-pointer hover:bg-bg-secondary/50"
 								onclick={() => toggleExpand(order.id)}
 							>
-								<td class="px-6 py-4">
-									<span class="font-mono text-sm font-medium text-accent"
+								<td class="px-6 py-4"
+									><span class="font-mono text-sm font-medium text-accent"
 										>#{order.id.slice(0, 8)}</span
-									>
-								</td>
-								<td class="px-6 py-4 text-sm text-text-primary">
-									{order.shippingAddress?.name || 'N/A'}
-								</td>
-								<td class="px-6 py-4 text-sm text-text-secondary">
-									{order.shippingAddress?.email || order.guestEmail || 'N/A'}
-								</td>
-								<td class="px-6 py-4 text-sm text-text-secondary">
-									{new Date(order.created).toLocaleDateString('en-US', {
+									></td
+								>
+								<td class="px-6 py-4 text-sm text-text-primary"
+									>{order.shippingAddress?.name || 'N/A'}</td
+								>
+								<td class="px-6 py-4 text-sm text-text-secondary"
+									>{order.shippingAddress?.email || order.guestEmail || 'N/A'}</td
+								>
+								<td class="px-6 py-4 text-sm text-text-secondary"
+									>{new Date(order.created).toLocaleDateString('en-US', {
 										month: 'short',
 										day: 'numeric',
 										year: 'numeric'
-									})}
-								</td>
-								<td class="px-6 py-4 text-sm font-semibold text-accent">
-									{formatPrice(order.total)}
-								</td>
-								<td class="px-6 py-4">
-									<span
+									})}</td
+								>
+								<td class="px-6 py-4 text-sm font-semibold text-accent"
+									>{formatPrice(order.total)}</td
+								>
+								<td class="px-6 py-4"
+									><span
 										class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold capitalize {statusColors[
 											order.status
-										] || 'bg-gray-100 text-gray-800'}"
-									>
-										{order.status}
-									</span>
-								</td>
+										] || 'bg-gray-100 text-gray-800'}">{order.status}</span
+									></td
+								>
 							</tr>
 							{#if expandedOrderId === order.id}
 								<tr>

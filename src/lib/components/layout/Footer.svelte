@@ -43,7 +43,7 @@
 	<div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
 		<div class="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-5">
 			<div class="lg:col-span-2">
-				<h3 class="mb-4 text-2xl font-[var(--font-playfair)] font-bold">LUXE</h3>
+				<h3 class="mb-4 text-2xl font-[var(--font-playfair)] font-bold">URAZBOX</h3>
 				<p class="mb-6 max-w-md text-gray-400">
 					Elevate your style with our curated collection of premium products. Quality craftsmanship
 					meets modern elegance.
@@ -108,7 +108,7 @@
 			class="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 md:flex-row"
 		>
 			<p class="text-sm text-gray-400">
-				© {new Date().getFullYear()} Luxe Store. All rights reserved.
+				© {new Date().getFullYear()} URAZBOX. All rights reserved.
 			</p>
 			<div class="flex items-center gap-6">
 				<a

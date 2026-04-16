@@ -50,10 +50,12 @@
 </svelte:head>
 
 <div>
-	<div class="mb-6 flex items-center justify-between">
-		<h1 class="text-3xl font-bold text-text-primary">Reviews</h1>
+	<div
+		class="mb-6 flex flex-col gap-4 overflow-x-hidden md:flex-row md:items-center md:justify-between"
+	>
+		<h1 class="text-2xl font-bold text-text-primary md:text-3xl">Reviews</h1>
 
-		<div class="flex gap-2">
+		<div class="custom-scrollbar flex gap-2 overflow-x-auto pb-2">
 			<button
 				class="rounded-lg px-4 py-2 text-sm font-medium transition-colors {filter === 'all'
 					? 'bg-accent text-white'
@@ -114,66 +116,64 @@
 	{:else}
 		<div class="space-y-4">
 			{#each filteredReviews as review (review.id)}
-				<div class="rounded-xl bg-white p-6 shadow-sm">
-					<div class="flex items-start justify-between">
-						<div class="flex items-start gap-4">
-							<div>
-								<div class="flex items-center gap-2">
-									<span class="font-semibold text-text-primary">
-										{review.title}
-									</span>
+				<div class="rounded-xl bg-white p-4 shadow-sm sm:p-6">
+					<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+						<div class="min-w-0">
+							<div class="flex flex-wrap items-center gap-2">
+								<span class="font-semibold text-text-primary">
+									{review.title}
+								</span>
+								<span
+									class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
+								>
+									<svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+										<path
+											fill-rule="evenodd"
+											d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+											clip-rule="evenodd"
+										/>
+									</svg>
+									Verified Purchase
+								</span>
+								{#if review.approved}
 									<span
-										class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
+										class="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
 									>
-										<svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-											<path
-												fill-rule="evenodd"
-												d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-												clip-rule="evenodd"
-											/>
-										</svg>
-										Verified Purchase
+										Approved
 									</span>
-									{#if review.approved}
-										<span
-											class="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
-										>
-											Approved
-										</span>
-									{:else}
-										<span
-											class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700"
-										>
-											Pending
-										</span>
-									{/if}
-								</div>
-								<p class="text-sm text-text-muted">
-									{review.expand?.user?.email || ''}
-								</p>
-
-								<div class="mt-2 flex text-amber-400">
-									{#each Array(review.rating) as _}
-										<span>★</span>
-									{/each}
-								</div>
-
-								{#if review.comment}
-									<p class="mt-2 text-text-secondary">{review.comment}</p>
+								{:else}
+									<span
+										class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700"
+									>
+										Pending
+									</span>
 								{/if}
+							</div>
+							<p class="text-sm text-text-muted">
+								{review.expand?.user?.email || ''}
+							</p>
 
-								<div class="mt-3 flex items-center gap-4 text-sm text-text-muted">
-									<span>
-										Product: {review.expand?.product?.name || review.product}
-									</span>
-									<span>
-										{new Date(review.created).toLocaleDateString()}
-									</span>
-								</div>
+							<div class="mt-2 flex text-amber-400">
+								{#each Array(review.rating) as _}
+									<span>★</span>
+								{/each}
+							</div>
+
+							{#if review.comment}
+								<p class="mt-2 text-text-secondary">{review.comment}</p>
+							{/if}
+
+							<div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-muted">
+								<span>
+									Product: {review.expand?.product?.name || review.product}
+								</span>
+								<span>
+									{new Date(review.created).toLocaleDateString()}
+								</span>
 							</div>
 						</div>
 
-						<div class="flex gap-2">
+						<div class="flex flex-shrink-0 gap-2">
 							{#if !review.approved}
 								<Button variant="primary" size="sm" onclick={() => handleApprove(review.id)}>
 									Approve

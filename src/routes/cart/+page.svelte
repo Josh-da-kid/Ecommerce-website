@@ -5,6 +5,8 @@
 	import { formatPrice } from '$lib/utils/index';
 	import { getProductImage } from '$lib/stores/products';
 	import { pb, type Product } from '$lib/pocketbase';
+	import { isAuthenticated } from '$lib/stores/auth';
+	import { goto } from '$app/navigation';
 
 	let promoCode = $state('');
 	let promoApplied = $state(false);
@@ -50,6 +52,10 @@
 	}
 
 	onMount(() => {
+		if (!$isAuthenticated) {
+			goto('/login');
+			return;
+		}
 		refreshStocks();
 	});
 </script>

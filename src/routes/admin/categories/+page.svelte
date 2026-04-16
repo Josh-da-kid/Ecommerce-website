@@ -181,9 +181,90 @@
 			</p>
 		</div>
 	{:else}
-		<div class="overflow-hidden rounded-2xl bg-white shadow-sm">
-			<div class="overflow-x-auto">
-				<table class="w-full">
+		<!-- Mobile Card View -->
+		<div class="grid gap-3 md:hidden">
+			{#each filteredCategories as category (category.id)}
+				<div class="rounded-xl bg-white p-4 shadow-sm">
+					<div class="mb-3 flex items-center gap-3">
+						{#if category.image}
+							<div class="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-bg-secondary">
+								<img src={category.image} alt={category.name} class="h-full w-full object-cover" />
+							</div>
+						{:else}
+							<div
+								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-purple-100"
+							>
+								<svg
+									class="h-6 w-6 text-purple-600"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M4 6h16M4 10h16M4 14h16M4 18h16"
+									/>
+								</svg>
+							</div>
+						{/if}
+						<div class="min-w-0 flex-1">
+							<p class="truncate font-medium text-text-primary">{category.name}</p>
+							<p class="truncate text-xs text-text-muted">{category.slug}</p>
+						</div>
+					</div>
+					{#if category.description}
+						<p class="mb-3 line-clamp-2 text-sm text-text-secondary">{category.description}</p>
+					{:else}
+						<p class="mb-3 text-sm text-text-muted">No description</p>
+					{/if}
+					<div class="flex items-center justify-end gap-2 border-t border-border pt-3">
+						<button
+							class="rounded-lg p-2 transition-colors hover:bg-bg-secondary"
+							onclick={() => openEditModal(category)}
+						>
+							<svg
+								class="h-5 w-5 text-text-muted"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+								/>
+							</svg>
+						</button>
+						<button
+							class="rounded-lg p-2 transition-colors hover:bg-red-50"
+							onclick={() => deleteCategory(category.id)}
+						>
+							<svg
+								class="h-5 w-5 text-red-500"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+								/>
+							</svg>
+						</button>
+					</div>
+				</div>
+			{/each}
+		</div>
+
+		<!-- Desktop Table View -->
+		<div class="hidden overflow-hidden rounded-2xl bg-white shadow-sm md:block">
+			<div class="custom-scrollbar overflow-x-auto pb-2">
+				<table class="w-full min-w-[500px]">
 					<thead class="bg-bg-secondary">
 						<tr>
 							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Name</th>

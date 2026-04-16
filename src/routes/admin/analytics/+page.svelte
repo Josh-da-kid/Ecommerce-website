@@ -193,12 +193,14 @@
 {:else}
 	<div>
 		<!-- Key Metrics Cards -->
-		<div class="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-			<div class="rounded-2xl bg-white p-6 shadow-sm">
-				<div class="mb-4 flex items-center justify-between">
-					<div class="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100">
+		<div class="mb-8 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
+			<div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
+				<div class="mb-3 flex items-center justify-between sm:mb-4">
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100 sm:h-12 sm:w-12"
+					>
 						<svg
-							class="h-6 w-6 text-green-600"
+							class="h-5 w-5 text-green-600 sm:h-6 sm:w-6"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -212,15 +214,17 @@
 						</svg>
 					</div>
 				</div>
-				<p class="text-sm text-text-secondary">Total Revenue</p>
-				<p class="text-2xl font-bold text-text-primary">{formatPrice(totalRevenue)}</p>
+				<p class="text-xs text-text-secondary sm:text-sm">Total Revenue</p>
+				<p class="text-xl font-bold text-text-primary sm:text-2xl">{formatPrice(totalRevenue)}</p>
 			</div>
 
-			<div class="rounded-2xl bg-white p-6 shadow-sm">
-				<div class="mb-4 flex items-center justify-between">
-					<div class="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100">
+			<div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
+				<div class="mb-3 flex items-center justify-between sm:mb-4">
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 sm:h-12 sm:w-12"
+					>
 						<svg
-							class="h-6 w-6 text-blue-600"
+							class="h-5 w-5 text-blue-600 sm:h-6 sm:w-6"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -234,15 +238,19 @@
 						</svg>
 					</div>
 				</div>
-				<p class="text-sm text-text-secondary">Avg Order Value</p>
-				<p class="text-2xl font-bold text-text-primary">{formatPrice(averageOrderValue)}</p>
+				<p class="text-xs text-text-secondary sm:text-sm">Avg Order Value</p>
+				<p class="text-xl font-bold text-text-primary sm:text-2xl">
+					{formatPrice(averageOrderValue)}
+				</p>
 			</div>
 
-			<div class="rounded-2xl bg-white p-6 shadow-sm">
-				<div class="mb-4 flex items-center justify-between">
-					<div class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100">
+			<div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
+				<div class="mb-3 flex items-center justify-between sm:mb-4">
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 sm:h-12 sm:w-12"
+					>
 						<svg
-							class="h-6 w-6 text-purple-600"
+							class="h-5 w-5 text-purple-600 sm:h-6 sm:w-6"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -256,15 +264,17 @@
 						</svg>
 					</div>
 				</div>
-				<p class="text-sm text-text-secondary">Total Orders</p>
-				<p class="text-2xl font-bold text-text-primary">{totalOrders}</p>
+				<p class="text-xs text-text-secondary sm:text-sm">Total Orders</p>
+				<p class="text-xl font-bold text-text-primary sm:text-2xl">{totalOrders}</p>
 			</div>
 
-			<div class="rounded-2xl bg-white p-6 shadow-sm">
-				<div class="mb-4 flex items-center justify-between">
-					<div class="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100">
+			<div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
+				<div class="mb-3 flex items-center justify-between sm:mb-4">
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 sm:h-12 sm:w-12"
+					>
 						<svg
-							class="h-6 w-6 text-amber-600"
+							class="h-5 w-5 text-amber-600 sm:h-6 sm:w-6"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -278,8 +288,8 @@
 						</svg>
 					</div>
 				</div>
-				<p class="text-sm text-text-secondary">Conversion Rate</p>
-				<p class="text-2xl font-bold text-text-primary">
+				<p class="text-xs text-text-secondary sm:text-sm">Conversion Rate</p>
+				<p class="text-xl font-bold text-text-primary sm:text-2xl">
 					{totalOrders > 0
 						? ((totalOrders / Math.max(totalOrders * 10, 100)) * 100).toFixed(1)
 						: '0.0'}%
@@ -288,9 +298,8 @@
 		</div>
 
 		<!-- Charts Row -->
-		<div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
-			<!-- Revenue Overview Bar Chart -->
-			<div class="rounded-2xl bg-white p-6 shadow-sm lg:col-span-2">
+		<div class="mb-8 grid grid-cols-1 gap-4 overflow-x-hidden sm:gap-6 lg:grid-cols-3">
+			<div class="min-w-0 rounded-2xl bg-white p-4 shadow-sm sm:p-6 lg:col-span-2">
 				<h2 class="mb-6 text-lg font-semibold text-text-primary">Revenue Overview</h2>
 				{#if !hasRevenueData}
 					<div class="flex h-64 items-center justify-center text-text-secondary">
