@@ -8,8 +8,15 @@
 	let orders = $state<Order[]>([]);
 	let isLoading = $state(true);
 
-	let totalRevenue = $derived(orders.reduce((sum, o) => sum + o.total, 0));
+	let totalRevenue = $derived(
+		orders
+			.filter((o) => ['processing', 'shipped', 'delivered'].includes(o.status))
+			.reduce((sum, o) => sum + o.total, 0)
+	);
 	let totalOrders = $derived(orders.length);
+	let processedOrders = $derived(
+		orders.filter((o) => ['processing', 'shipped', 'delivered'].includes(o.status)).length
+	);
 	let totalProducts = $derived($products.length);
 	let totalCategories = $derived($categories.length);
 
@@ -123,6 +130,30 @@
 			</div>
 			<p class="text-xs text-text-secondary sm:text-sm">Total Orders</p>
 			<p class="text-xl font-bold text-text-primary sm:text-2xl">{totalOrders}</p>
+		</div>
+
+		<div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
+			<div class="mb-3 flex items-center justify-between sm:mb-4">
+				<div
+					class="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100 sm:h-12 sm:w-12"
+				>
+					<svg
+						class="h-5 w-5 text-green-600 sm:h-6 sm:w-6"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+						/>
+					</svg>
+				</div>
+			</div>
+			<p class="text-xs text-text-secondary sm:text-sm">Processed Orders</p>
+			<p class="text-xl font-bold text-text-primary sm:text-2xl">{processedOrders}</p>
 		</div>
 
 		<div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">

@@ -79,6 +79,10 @@ export interface Order {
 	status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
 	shippingAddress: ShippingAddress;
 	paymentMethod: string;
+	paymentStatus?: 'pending' | 'confirmed' | 'verified' | 'rejected';
+	paymentReference?: string;
+	paidAt?: string;
+	expiresAt?: string;
 	guestEmail: string;
 	created: string;
 	updated: string;

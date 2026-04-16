@@ -9,11 +9,23 @@
 	let activeFilter = $state('all');
 	let expandedOrderId = $state<string | null>(null);
 	let updatingStatus = $state<string | null>(null);
+	let searchQuery = $state('');
 
 	const statuses = ['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'];
 
 	let filteredOrders = $derived(
-		activeFilter === 'all' ? orders : orders.filter((o) => o.status === activeFilter)
+		orders
+			.filter((o) => activeFilter === 'all' || o.status === activeFilter)
+			.filter((o) => {
+				if (!searchQuery.trim()) return true;
+				const query = searchQuery.toLowerCase();
+				return (
+					o.id.toLowerCase().includes(query) ||
+					o.paymentReference?.toLowerCase().includes(query) ||
+					o.shippingAddress?.name?.toLowerCase().includes(query) ||
+					o.shippingAddress?.email?.toLowerCase().includes(query)
+				);
+			})
 	);
 
 	const statusColors: Record<string, string> = {
@@ -41,10 +53,14 @@
 	async function updateStatus(id: string, newStatus: string) {
 		updatingStatus = id;
 		try {
-			await pb.collection('estore_orders').update(id, { status: newStatus });
-			orders = orders.map((o) =>
-				o.id === id ? { ...o, status: newStatus as Order['status'] } : o
-			);
+			const updateData: any = { status: newStatus };
+			if (newStatus === 'processing' || newStatus === 'delivered') {
+				updateData.paymentStatus = 'verified';
+			} else if (newStatus === 'cancelled') {
+				updateData.paymentStatus = 'rejected';
+			}
+			await pb.collection('estore_orders').update(id, updateData);
+			orders = orders.map((o) => (o.id === id ? { ...o, ...updateData } : o));
 		} catch (e: any) {
 			error = e.message || 'Failed to update order status';
 		} finally {
@@ -84,26 +100,49 @@
 <div>
 	<div class="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
 		<h2 class="text-2xl font-bold text-text-primary">Orders</h2>
-		<button
-			onclick={fetchOrders}
-			disabled={loading}
-			class="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-text-primary shadow-sm transition-colors hover:bg-bg-secondary disabled:opacity-50"
-		>
-			<svg
-				class="h-4 w-4 {loading ? 'animate-spin' : ''}"
-				fill="none"
-				stroke="currentColor"
-				viewBox="0 0 24 24"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="2"
-					d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+		<div class="flex items-center gap-3">
+			<div class="relative">
+				<input
+					type="text"
+					bind:value={searchQuery}
+					placeholder="Search by ID, ref, name..."
+					class="h-10 w-64 rounded-xl border border-border bg-white px-4 pl-10 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
 				/>
-			</svg>
-			Refresh
-		</button>
+				<svg
+					class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-text-muted"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+					/>
+				</svg>
+			</div>
+			<button
+				onclick={fetchOrders}
+				disabled={loading}
+				class="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-text-primary shadow-sm transition-colors hover:bg-bg-secondary disabled:opacity-50"
+			>
+				<svg
+					class="h-4 w-4 {loading ? 'animate-spin' : ''}"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+					/>
+				</svg>
+				Refresh
+			</button>
+		</div>
 	</div>
 
 	{#if error}
@@ -163,7 +202,14 @@
 			{#each filteredOrders as order (order.id)}
 				<div class="rounded-xl bg-white p-4 shadow-sm">
 					<div class="mb-3 flex items-center justify-between">
-						<span class="font-mono text-sm font-medium text-accent">#{order.id.slice(0, 8)}</span>
+						<div>
+							<span class="font-mono text-sm font-medium text-accent"
+								>#{order.paymentReference || order.id.slice(0, 15).toUpperCase()}</span
+							>
+							{#if order.paymentReference}
+								<p class="text-[10px] text-text-muted">Ref: {order.paymentReference}</p>
+							{/if}
+						</div>
 						<span
 							class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold capitalize {statusColors[
 								order.status
@@ -247,7 +293,7 @@
 				<table class="w-full min-w-[700px]">
 					<thead class="bg-bg-secondary">
 						<tr>
-							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Order ID</th>
+							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Reference</th>
 							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Customer</th>
 							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Email</th>
 							<th class="px-6 py-3 text-left text-sm font-semibold text-text-primary">Date</th>
@@ -263,7 +309,7 @@
 							>
 								<td class="px-6 py-4"
 									><span class="font-mono text-sm font-medium text-accent"
-										>#{order.id.slice(0, 8)}</span
+										>{order.paymentReference || order.id.slice(0, 15).toUpperCase()}</span
 									></td
 								>
 								<td class="px-6 py-4 text-sm text-text-primary"

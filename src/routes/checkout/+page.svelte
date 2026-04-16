@@ -13,6 +13,18 @@
 	let orderId = $state('');
 	let orderPlaced = $state(false);
 	let submitted = $state(false);
+	let showPaymentModal = $state(false);
+	let paymentConfirmed = $state(false);
+	let timeRemaining = $state(30 * 60);
+	let timerInterval: any = null;
+	let orderTotal = $state(0);
+	let paymentReference = $state('');
+
+	const PAYMENT_ACCOUNT = {
+		bank: 'Moniepoint',
+		accountName: 'Urazbox Enterprise',
+		accountNumber: '6559239886'
+	};
 
 	let contact = $state({ email: '', phone: '' });
 	let shipping = $state({ name: '', street: '', city: '', state: '', zip: '', country: '' });
@@ -39,6 +51,12 @@
 			!errors.country
 	);
 
+	let formattedTime = $derived(() => {
+		const mins = Math.floor(timeRemaining / 60);
+		const secs = timeRemaining % 60;
+		return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+	});
+
 	$effect(() => {
 		if (browser && $cart.length === 0 && !orderPlaced) {
 			goto('/cart');
@@ -53,6 +71,46 @@
 		}
 	});
 
+	$effect(() => {
+		if (showPaymentModal && !paymentConfirmed && timeRemaining > 0) {
+			timerInterval = setInterval(() => {
+				timeRemaining--;
+				if (timeRemaining <= 0) {
+					clearInterval(timerInterval);
+					handlePaymentExpired();
+				}
+			}, 1000);
+			return () => clearInterval(timerInterval);
+		}
+	});
+
+	async function handlePaymentExpired() {
+		if (orderId) {
+			try {
+				await pb.collection('estore_orders').update(orderId, { status: 'cancelled' });
+			} catch {}
+		}
+		showPaymentModal = false;
+		orderPlaced = false;
+		toasts.show('error', 'Order has been cancelled due to expired payment time.');
+	}
+
+	async function confirmPayment() {
+		if (!orderId) return;
+		paymentConfirmed = true;
+		clearInterval(timerInterval);
+		try {
+			await pb.collection('estore_orders').update(orderId, {
+				paymentStatus: 'confirmed',
+				paidAt: new Date().toISOString()
+			});
+			cart.clear();
+			toasts.show('success', 'Payment confirmed! An admin will verify your payment shortly.');
+		} catch {
+			toasts.show('error', 'Failed to confirm payment. Please try again.');
+		}
+	}
+
 	async function placeOrder() {
 		submitted = true;
 		if (!isValid) return;
@@ -60,6 +118,8 @@
 		isProcessing = true;
 
 		const now = new Date().toISOString();
+		const tempId = crypto.randomUUID().slice(0, 15).toUpperCase();
+		const newPaymentRef = `URZ${tempId}`;
 
 		const items: OrderItem[] = $cart.map((item) => ({
 			productId: item.product.id,
@@ -113,12 +173,16 @@
 					total: $cartTotal,
 					status: 'pending',
 					shippingAddress: JSON.stringify(shippingAddress),
-					paymentMethod: 'pay-on-delivery',
+					paymentMethod: 'bank-transfer',
+					paymentStatus: 'pending',
+					paymentReference: newPaymentRef,
 					user: $user?.id || '',
 					created: now,
-					updated: now
+					updated: now,
+					expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString()
 				});
 				orderId = record.id;
+				paymentReference = newPaymentRef;
 
 				for (const pid of Object.keys(stockEntries)) {
 					const entry = stockEntries[pid];
@@ -131,6 +195,9 @@
 				const orders = existing ? JSON.parse(existing) : [];
 				orders.push({ ...record, shippingAddress, items });
 				localStorage.setItem('luxe_orders', JSON.stringify(orders));
+
+				orderTotal = $cartTotal;
+				showPaymentModal = true;
 			} catch (_e: unknown) {
 				toasts.show('error', 'Failed to place order. Please try again.');
 				isProcessing = false;
@@ -140,14 +207,7 @@
 			orderId = 'N/A';
 		}
 
-		orderPlaced = true;
-		cart.clear();
-		toasts.show('success', `Order placed successfully! Order ID: ${orderId}`);
 		isProcessing = false;
-
-		setTimeout(() => {
-			goto('/orders');
-		}, 3000);
 	}
 </script>
 
@@ -159,7 +219,7 @@
 	<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 		<h1 class="mb-8 text-4xl font-[var(--font-playfair)] font-bold text-text-primary">Checkout</h1>
 
-		{#if orderPlaced}
+		{#if orderPlaced && !showPaymentModal}
 			<div class="mx-auto max-w-2xl text-center">
 				<div class="rounded-2xl bg-white p-12 shadow-lg">
 					<div
@@ -284,10 +344,7 @@
 
 						<div class="rounded-2xl bg-white p-8 shadow-lg">
 							<h2 class="mb-4 text-xl font-semibold text-text-primary">Payment Method</h2>
-							<label
-								class="flex cursor-pointer items-center gap-4 rounded-xl border-2 border-accent bg-accent/5 p-4"
-							>
-								<input type="radio" name="payment" checked class="h-5 w-5 text-accent" />
+							<div class="rounded-xl border-2 border-accent bg-accent/5 p-4">
 								<div class="flex items-center gap-3">
 									<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
 										<svg
@@ -300,16 +357,16 @@
 												stroke-linecap="round"
 												stroke-linejoin="round"
 												stroke-width="2"
-												d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+												d="M3 10h18M7 15h1m2 0h1m-2 5h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"
 											></path>
 										</svg>
 									</div>
 									<div>
-										<p class="font-medium text-text-primary">Pay on Delivery</p>
-										<p class="text-sm text-text-muted">Payment upon delivery</p>
+										<p class="font-medium text-text-primary">Bank Transfer</p>
+										<p class="text-sm text-text-muted">Transfer to Moniepoint account</p>
 									</div>
 								</div>
-							</label>
+							</div>
 						</div>
 
 						<Button
@@ -390,3 +447,180 @@
 		{/if}
 	</div>
 </div>
+
+{#if showPaymentModal}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+		<div class="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+			<div class="p-6">
+				<div class="mb-6 text-center">
+					{#if paymentConfirmed}
+						<div
+							class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100"
+						>
+							<svg
+								class="h-8 w-8 text-green-600"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M5 13l4 4L19 7"
+								/>
+							</svg>
+						</div>
+						<h2 class="text-2xl font-bold text-text-primary">Payment Confirmed!</h2>
+						<p class="mt-2 text-text-secondary">An admin will verify your payment shortly.</p>
+					{:else}
+						<div
+							class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100"
+						>
+							<svg
+								class="h-8 w-8 text-amber-600"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+								/>
+							</svg>
+						</div>
+						<h2 class="text-2xl font-bold text-text-primary">Complete Payment</h2>
+						<p class="mt-2 text-text-secondary">
+							Transfer {formatPrice(orderTotal)} to complete your order
+						</p>
+
+						<div class="mt-4 rounded-xl bg-accent/10 p-4">
+							<p class="mb-2 text-center text-sm font-medium text-text-muted uppercase">
+								Your Payment Reference
+							</p>
+							<div class="flex items-center justify-center gap-2">
+								<span class="font-mono text-2xl font-bold tracking-wider text-accent"
+									>{paymentReference}</span
+								>
+								<button
+									type="button"
+									class="rounded-lg p-1 hover:bg-accent/20"
+									onclick={() => navigator.clipboard.writeText(paymentReference)}
+								>
+									<svg
+										class="h-5 w-5 text-accent"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+										/>
+									</svg>
+								</button>
+							</div>
+							<p class="mt-3 text-center text-xs text-text-muted">
+								Include this reference in your transfer description
+							</p>
+						</div>
+					{/if}
+				</div>
+
+				<div class="mb-6 rounded-xl bg-bg-secondary p-5">
+					<p class="mb-4 text-center text-sm font-medium tracking-wide text-text-muted uppercase">
+						Transfer Details
+					</p>
+					<div class="space-y-3">
+						<div class="flex justify-between">
+							<span class="text-text-muted">Bank</span>
+							<span class="font-semibold text-text-primary">{PAYMENT_ACCOUNT.bank}</span>
+						</div>
+						<div class="flex justify-between">
+							<span class="text-text-muted">Account Name</span>
+							<span class="font-semibold text-text-primary">{PAYMENT_ACCOUNT.accountName}</span>
+						</div>
+						<div class="flex items-center justify-between">
+							<span class="text-text-muted">Account Number</span>
+							<div class="flex items-center gap-2">
+								<span class="font-mono text-lg font-bold text-accent"
+									>{PAYMENT_ACCOUNT.accountNumber}</span
+								>
+								<button
+									type="button"
+									class="rounded-lg p-1 hover:bg-bg-secondary"
+									onclick={() => navigator.clipboard.writeText(PAYMENT_ACCOUNT.accountNumber)}
+								>
+									<svg
+										class="h-4 w-4 text-text-muted"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+										/>
+									</svg>
+								</button>
+							</div>
+						</div>
+						<div class="flex justify-between border-t border-border pt-3">
+							<span class="text-text-muted">Amount</span>
+							<span class="text-xl font-bold text-accent">{formatPrice(orderTotal)}</span>
+						</div>
+					</div>
+				</div>
+
+				{#if !paymentConfirmed}
+					<div class="mb-6 rounded-xl bg-red-50 p-4">
+						<div class="flex items-center gap-3">
+							<svg
+								class="h-5 w-5 text-red-500"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+								/>
+							</svg>
+							<div>
+								<p class="text-sm font-medium text-red-800">Time Remaining</p>
+								<p class="text-lg font-bold text-red-600">{formattedTime()}</p>
+							</div>
+						</div>
+					</div>
+				{/if}
+
+				<div class="space-y-3">
+					{#if paymentConfirmed}
+						<Button variant="primary" class="w-full" onclick={() => goto('/orders')}>
+							View My Orders
+						</Button>
+					{:else}
+						<Button variant="primary" class="w-full" onclick={confirmPayment}>
+							I Have Made the Transfer
+						</Button>
+						<Button variant="ghost" class="w-full" onclick={handlePaymentExpired}>
+							Cancel Order
+						</Button>
+					{/if}
+				</div>
+
+				<p class="mt-4 text-center text-xs text-text-muted">
+					Order ID: <span class="font-mono">{orderId.slice(0, 8)}</span>
+				</p>
+			</div>
+		</div>
+	</div>
+{/if}

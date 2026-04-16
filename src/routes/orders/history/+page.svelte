@@ -166,8 +166,10 @@
 						<div class="p-6">
 							<div class="mb-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
 								<div>
-									<p class="text-sm text-text-secondary">Order ID</p>
-									<p class="font-semibold text-text-primary">{order.id}</p>
+									<p class="text-sm text-text-secondary">Order Reference</p>
+									<p class="font-mono text-lg font-semibold text-accent">
+										{order.paymentReference || order.id.slice(0, 15).toUpperCase()}
+									</p>
 								</div>
 								<div class="flex items-center gap-4">
 									<p class="text-sm text-text-secondary">{formatDate(order.created)}</p>
