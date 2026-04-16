@@ -3,40 +3,35 @@
 	import { isAdmin, isAuthenticated, authInitialized, logout } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { get } from 'svelte/store';
 
 	let { children } = $props();
 
 	let sidebarOpen = $state(false);
 	let loading = $state(true);
 
-	function checkAuth() {
-		if (!get(authInitialized)) return false;
-		if (!get(isAuthenticated)) {
-			goto('/login');
-		} else if (!get(isAdmin)) {
-			goto('/');
-		}
-		return true;
-	}
-
 	onMount(() => {
-		const timeout = setTimeout(() => {
+		const checkAuth = () => {
+			if (!$authInitialized) {
+				setTimeout(checkAuth, 100);
+				return;
+			}
+
+			if (!$isAuthenticated) {
+				goto('/login');
+				return;
+			}
+
+			if (!$isAdmin) {
+				goto('/');
+				return;
+			}
+
 			loading = false;
-		}, 500);
+		};
 
-		if (!checkAuth()) {
-			const unsub = authInitialized.subscribe((initialized) => {
-				if (initialized) {
-					checkAuth();
-					clearTimeout(timeout);
-				}
-			});
-			return unsub;
-		}
+		checkAuth();
 
-		loading = false;
-		return () => clearTimeout(timeout);
+		return () => {};
 	});
 
 	const navItems = [
