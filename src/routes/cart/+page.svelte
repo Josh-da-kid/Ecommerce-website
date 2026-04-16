@@ -6,7 +6,7 @@
 	import { formatPrice } from '$lib/utils/index';
 	import { getProductImage } from '$lib/stores/products';
 	import { pb, type Product } from '$lib/pocketbase';
-	import { isAuthenticated } from '$lib/stores/auth';
+	import { isAuthenticated, authInitialized } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
 	import { toasts } from '$lib/stores/toast';
 
@@ -26,6 +26,25 @@
 	function getCurrentComparePrice(productId: string): number | undefined {
 		const live = getLiveProduct(productId);
 		return live?.comparePrice ?? undefined;
+	}
+
+	function isColorAvailable(productId: string, color: string): boolean {
+		const live = getLiveProduct(productId);
+		if (!live?.colors || !Array.isArray(live.colors) || live.colors.length === 0) return true;
+		if (!color) return false;
+		return live.colors.includes(color);
+	}
+
+	function isSizeAvailable(productId: string, size: string): boolean {
+		const live = getLiveProduct(productId);
+		if (!live?.sizes || !Array.isArray(live.sizes) || live.sizes.length === 0) return true;
+		if (!size) return false;
+		return live.sizes.includes(size);
+	}
+
+	function getCurrentStock(productId: string): number {
+		const live = getLiveProduct(productId);
+		return live?.stock ?? 0;
 	}
 
 	function formatPriceSafe(value: number | undefined): string {
@@ -73,6 +92,14 @@
 
 	let finalTotal = $derived(promoApplied ? liveCartTotal * 0.8 : liveCartTotal);
 
+	let hasUnavailableItems = $derived(
+		$cart.some(
+			(item) =>
+				!isColorAvailable(item.product.id, item.color) ||
+				!isSizeAvailable(item.product.id, item.size)
+		)
+	);
+
 	async function refreshStocks() {
 		const stocks: Record<string, number> = {};
 		for (const item of $cart) {
@@ -89,11 +116,29 @@
 	}
 
 	onMount(() => {
+		if (!$authInitialized) {
+			const unsub = authInitialized.subscribe((val) => {
+				if (val) {
+					if (!$isAuthenticated) {
+						goto('/login');
+						return;
+					}
+					refreshStocks();
+				}
+			});
+			return () => unsub();
+		}
 		if (!$isAuthenticated) {
 			goto('/login');
 			return;
 		}
 		refreshStocks();
+	});
+
+	$effect(() => {
+		if ($authInitialized && !$isAuthenticated) {
+			goto('/login');
+		}
 	});
 </script>
 
@@ -134,10 +179,13 @@
 			<div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
 				<div class="space-y-6 lg:col-span-2">
 					{#each $cart as item (`${item.product.id}-${item.color}-${item.size}`)}
-						{@const stock = productStocks[item.product.id] ?? item.product.stock}
+						{@const stock = getCurrentStock(item.product.id)}
 						{@const isOverStock = item.quantity > stock}
+						{@const colorAvailable = isColorAvailable(item.product.id, item.color)}
+						{@const sizeAvailable = isSizeAvailable(item.product.id, item.size)}
+						{@const isUnavailable = !colorAvailable || !sizeAvailable}
 						<div
-							class="flex gap-6 rounded-2xl bg-white p-6 shadow-lg {isOverStock
+							class="flex gap-6 rounded-2xl bg-white p-6 shadow-lg {isOverStock || isUnavailable
 								? 'ring-2 ring-error/50'
 								: ''}"
 						>
@@ -199,6 +247,15 @@
 								{#if isOverStock}
 									<p class="mb-2 text-xs font-medium text-error">
 										Only {stock} left in stock. Please update quantity.
+									</p>
+								{/if}
+
+								{#if isUnavailable}
+									<p class="mb-2 text-xs font-medium text-error">
+										{#if !colorAvailable}Color "{item.color}" is no longer available.{/if}
+										{#if !colorAvailable && !sizeAvailable}{/if}
+										{#if !sizeAvailable}Size "{item.size}" is no longer available.{/if}
+										<a href="/products/{item.product.id}" class="underline">Choose options</a> to proceed.
 									</p>
 								{/if}
 
@@ -301,7 +358,11 @@
 						</div>
 
 						<a href="/checkout" class="block">
-							<Button variant="primary" size="lg" class="w-full">Proceed to Checkout</Button>
+							<Button variant="primary" size="lg" class="w-full" disabled={hasUnavailableItems}>
+								{hasUnavailableItems
+									? 'Remove unavailable items to checkout'
+									: 'Proceed to Checkout'}
+							</Button>
 						</a>
 
 						<a

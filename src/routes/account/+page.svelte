@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { user, isAuthenticated, isAdmin, logout } from '$lib/stores/auth';
+	import { user, isAuthenticated, isAdmin, logout, authInitialized } from '$lib/stores/auth';
 	import { browser } from '$app/environment';
 	import { pb, type Order } from '$lib/pocketbase';
 	import { formatPrice } from '$lib/utils/index';
@@ -43,9 +43,26 @@
 	}
 
 	onMount(() => {
+		if (!$authInitialized) {
+			const unsub = authInitialized.subscribe((val) => {
+				if (val) {
+					if (!$isAuthenticated) {
+						goto('/login');
+						return;
+					}
+					initializePage();
+				}
+			});
+			return () => unsub();
+		}
 		if (browser && !$isAuthenticated) {
 			goto('/login');
+			return;
 		}
+		initializePage();
+	});
+
+	function initializePage() {
 		fetchOrders().then(() => {
 			loaded = true;
 		});
@@ -65,7 +82,7 @@
 				.unsubscribe('*')
 				.catch(() => {});
 		};
-	});
+	}
 
 	const statusColors: Record<string, string> = {
 		pending: 'bg-yellow-100 text-yellow-800',

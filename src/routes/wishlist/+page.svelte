@@ -5,7 +5,7 @@
 	import { ProductCard } from '$lib/components/product';
 	import { Button } from '$lib/components/ui';
 	import type { Product } from '$lib/pocketbase';
-	import { isAuthenticated } from '$lib/stores/auth';
+	import { isAuthenticated, authInitialized } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
 
 	let wishlistValue = $state<string[]>([]);
@@ -21,7 +21,23 @@
 	);
 
 	onMount(() => {
+		if (!$authInitialized) {
+			const unsub = authInitialized.subscribe((val) => {
+				if (val) {
+					if (!$isAuthenticated) {
+						goto('/login');
+					}
+				}
+			});
+			return () => unsub();
+		}
 		if (!$isAuthenticated) {
+			goto('/login');
+		}
+	});
+
+	$effect(() => {
+		if ($authInitialized && !$isAuthenticated) {
 			goto('/login');
 		}
 	});

@@ -13,9 +13,9 @@
 	let { open = $bindable(false), title = '', size = 'md', onclose, children }: Props = $props();
 
 	const sizeClasses = {
-		sm: 'max-w-sm',
-		md: 'max-w-lg',
-		lg: 'max-w-2xl'
+		sm: 'max-w-sm max-h-[90vh]',
+		md: 'max-w-lg max-h-[90vh]',
+		lg: 'max-w-2xl max-h-[90vh]'
 	};
 
 	function handleBackdropClick(e: MouseEvent) {
@@ -46,11 +46,11 @@
 		<div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
 
 		<div
-			class="relative w-full rounded-2xl bg-white shadow-2xl {sizeClasses[size]}"
+			class="relative w-full overflow-hidden rounded-2xl bg-white shadow-2xl {sizeClasses[size]}"
 			transition:scale={{ duration: 200, start: 0.95 }}
 		>
 			{#if title}
-				<div class="flex items-center justify-between border-b border-border p-6">
+				<div class="flex shrink-0 items-center justify-between border-b border-border p-6">
 					<h3 class="text-xl font-[var(--font-playfair)] font-semibold text-text-primary">
 						{title}
 					</h3>
@@ -73,7 +73,7 @@
 				</div>
 			{/if}
 
-			<div class="p-6">
+			<div class="max-h-[calc(90vh-80px)] overflow-y-auto p-6">
 				{#if children}
 					{@render children()}
 				{/if}

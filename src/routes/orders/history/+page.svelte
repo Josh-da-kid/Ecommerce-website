@@ -5,13 +5,14 @@
 	import { pb, type Order } from '$lib/pocketbase';
 	import { formatPrice } from '$lib/utils/index';
 	import { Button } from '$lib/components/ui';
-	import { isAuthenticated, user } from '$lib/stores/auth';
+	import { isAuthenticated, user, authInitialized } from '$lib/stores/auth';
 
 	let orders = $state<Order[]>([]);
 	let expandedOrderId = $state<string | null>(null);
 	let loading = $state(true);
 	let filter = $state<'all' | 'delivered' | 'cancelled'>('all');
 	let currentUserId = $state<string | null>(null);
+	let initialized = $state(false);
 
 	async function fetchOrders() {
 		loading = true;
@@ -26,7 +27,7 @@
 					const stored = localStorage.getItem('luxe_orders');
 					if (stored) {
 						orders = (JSON.parse(stored) as Order[])
-							.filter((o) => !currentUserId || o.user === currentUserId)
+							.filter((o: Order) => !currentUserId || o.user === currentUserId)
 							.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
 					}
 				} catch {}
@@ -37,12 +38,33 @@
 	}
 
 	onMount(() => {
+		if (!$authInitialized) {
+			const unsub = authInitialized.subscribe((val) => {
+				if (val) {
+					initialized = true;
+					if (!$isAuthenticated) {
+						goto('/login');
+						return;
+					}
+					currentUserId = $user?.id ?? null;
+					fetchOrders();
+				}
+			});
+			return () => unsub();
+		}
+		initialized = true;
 		if (!$isAuthenticated) {
 			goto('/login');
 			return;
 		}
 		currentUserId = $user?.id ?? null;
 		fetchOrders();
+	});
+
+	$effect(() => {
+		if ($authInitialized && !$isAuthenticated) {
+			goto('/login');
+		}
 	});
 
 	function formatDate(dateStr: string): string {
@@ -93,7 +115,7 @@
 						/>
 					</svg>
 				</a>
-				<h1 class="text-4xl font-[var(--font-playfair)] font-bold text-text-primary">
+				<h1 class="text-4xl font-[var(--font-font-playfair)] font-bold text-text-primary">
 					Order History
 				</h1>
 			</div>

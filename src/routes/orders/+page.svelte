@@ -5,12 +5,14 @@
 	import { pb, type Order } from '$lib/pocketbase';
 	import { formatPrice } from '$lib/utils/index';
 	import { Button } from '$lib/components/ui';
-	import { isAuthenticated, user } from '$lib/stores/auth';
+	import { isAuthenticated, user, authInitialized } from '$lib/stores/auth';
 
 	let orders = $state<Order[]>([]);
 	let expandedOrderId = $state<string | null>(null);
 	let loading = $state(true);
 	let currentUserId = $state<string | null>(null);
+
+	let initialized = $state(false);
 
 	async function fetchOrders() {
 		loading = true;
@@ -36,13 +38,32 @@
 	}
 
 	onMount(() => {
+		if (!$authInitialized) {
+			const unsub = authInitialized.subscribe((val) => {
+				if (val) {
+					initialized = true;
+					if (!$isAuthenticated) {
+						goto('/login');
+						return;
+					}
+					currentUserId = $user?.id ?? null;
+					fetchOrders();
+					subcribeToOrders();
+				}
+			});
+			return () => unsub();
+		}
+		initialized = true;
 		if (!$isAuthenticated) {
 			goto('/login');
 			return;
 		}
 		currentUserId = $user?.id ?? null;
 		fetchOrders();
+		subcribeToOrders();
+	});
 
+	function subcribeToOrders() {
 		pb.collection('estore_orders').subscribe('*', (e) => {
 			if (e.action === 'create') {
 				const newOrder = e.record as unknown as Order;
@@ -55,13 +76,7 @@
 				orders = orders.filter((o) => o.id !== e.record.id);
 			}
 		});
-
-		return () => {
-			pb.collection('estore_orders')
-				.unsubscribe('*')
-				.catch(() => {});
-		};
-	});
+	}
 
 	function formatDate(dateStr: string): string {
 		return new Date(dateStr).toLocaleDateString('en-US', {

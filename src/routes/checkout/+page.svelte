@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import { user, isAuthenticated } from '$lib/stores/auth';
+	import { user, isAuthenticated, authInitialized } from '$lib/stores/auth';
 	import { cart, cartTotal, cartSubtotal, cartSavings } from '$lib/stores';
+	import { products } from '$lib/stores/products';
 	import { Button, Input } from '$lib/components/ui';
 	import { formatPrice } from '$lib/utils/index';
 	import { getProductImage } from '$lib/stores/products';
@@ -19,6 +20,32 @@
 	let timerInterval: any = null;
 	let orderTotal = $state(0);
 	let paymentReference = $state('');
+
+	function getLiveProduct(productId: string): Product | undefined {
+		return $products.find((p) => p.id === productId);
+	}
+
+	function isColorAvailable(productId: string, color: string): boolean {
+		const live = getLiveProduct(productId);
+		if (!live?.colors || !Array.isArray(live.colors) || live.colors.length === 0) return true;
+		if (!color) return false;
+		return live.colors.includes(color);
+	}
+
+	function isSizeAvailable(productId: string, size: string): boolean {
+		const live = getLiveProduct(productId);
+		if (!live?.sizes || !Array.isArray(live.sizes) || live.sizes.length === 0) return true;
+		if (!size) return false;
+		return live.sizes.includes(size);
+	}
+
+	let hasUnavailableItems = $derived(
+		$cart.some(
+			(item) =>
+				!isColorAvailable(item.product.id, item.color) ||
+				!isSizeAvailable(item.product.id, item.size)
+		)
+	);
 
 	const PAYMENT_ACCOUNT = {
 		bank: 'Moniepoint',
@@ -55,6 +82,12 @@
 		const mins = Math.floor(timeRemaining / 60);
 		const secs = timeRemaining % 60;
 		return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+	});
+
+	$effect(() => {
+		if ($authInitialized && !$isAuthenticated) {
+			goto('/login');
+		}
 	});
 
 	$effect(() => {
@@ -415,11 +448,14 @@
 							class="w-full"
 							size="lg"
 							loading={isProcessing}
+							disabled={hasUnavailableItems}
 							onclick={placeOrder}
 						>
 							{isProcessing
 								? 'Placing Order...'
-								: `Place Order  \u2022  ${formatPrice($cartTotal)}`}
+								: hasUnavailableItems
+									? 'Review Cart'
+									: `Place Order  \u2022  ${formatPrice($cartTotal)}`}
 						</Button>
 
 						{#if !$isAuthenticated}
@@ -435,6 +471,15 @@
 				<div class="lg:col-span-1">
 					<div class="sticky top-24 rounded-2xl bg-white p-6 shadow-lg">
 						<h2 class="mb-6 text-xl font-semibold text-text-primary">Order Summary</h2>
+
+						{#if hasUnavailableItems}
+							<div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-4">
+								<p class="text-sm font-medium text-red-800">
+									Some items in your cart are no longer available with the selected options. Please
+									review your cart.
+								</p>
+							</div>
+						{/if}
 
 						<div class="mb-6 max-h-60 space-y-4 overflow-y-auto">
 							{#each $cart as item (`${item.product.id}-${item.color}-${item.size}`)}
