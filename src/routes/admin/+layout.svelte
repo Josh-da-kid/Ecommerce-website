@@ -103,7 +103,7 @@
 		<aside
 			class="fixed inset-y-0 left-0 z-50 w-64 flex-shrink-0 bg-primary text-white transition-transform duration-300 {sidebarOpen
 				? 'translate-x-0'
-				: '-translate-x-full'} lg:translate-x-0"
+				: '-translate-x-full'}"
 		>
 			<div class="flex items-center justify-between p-6">
 				<a href="/admin" class="text-2xl font-[var(--font-playfair)] font-bold">Admin</a>
@@ -180,7 +180,7 @@
 			>
 				<div class="flex items-center gap-3">
 					<button
-						class="rounded-lg p-2 hover:bg-bg-secondary lg:hidden"
+						class="rounded-lg p-2 hover:bg-bg-secondary"
 						onclick={() => (sidebarOpen = !sidebarOpen)}
 						aria-label="Toggle sidebar"
 					>
