@@ -6,10 +6,20 @@
 	import { pb, type Order } from '$lib/pocketbase';
 	import { formatPrice } from '$lib/utils/index';
 	import { Button } from '$lib/components/ui';
+	import { toasts } from '$lib/stores/toast';
 
 	let loaded = $state(false);
 	let activeTab = $state<'profile' | 'orders' | 'settings'>('profile');
 	let orders = $state<Order[]>([]);
+
+	let editingProfile = $state(false);
+	let savingProfile = $state(false);
+	let profileName = $state('');
+	let profilePhone = $state('');
+	let currentPassword = $state('');
+	let newPassword = $state('');
+	let confirmPassword = $state('');
+	let changingPassword = $state(false);
 
 	async function fetchOrders() {
 		try {
@@ -68,6 +78,64 @@
 	async function handleLogout() {
 		await logout();
 		goto('/');
+	}
+
+	async function saveProfile() {
+		if (!$user) return;
+		savingProfile = true;
+		try {
+			await pb.collection('estore_users').update($user.id, {
+				name: profileName,
+				phone: profilePhone
+			});
+			user.set({ ...$user, name: profileName, phone: profilePhone });
+			toasts.show('success', 'Profile updated successfully');
+			editingProfile = false;
+		} catch {
+			toasts.show('error', 'Failed to update profile');
+		} finally {
+			savingProfile = false;
+		}
+	}
+
+	async function changePassword() {
+		if (!$user) return;
+		if (!currentPassword) {
+			toasts.show('error', 'Please enter your current password');
+			return;
+		}
+		if (newPassword !== confirmPassword) {
+			toasts.show('error', 'Passwords do not match');
+			return;
+		}
+		if (newPassword.length < 6) {
+			toasts.show('error', 'Password must be at least 6 characters');
+			return;
+		}
+		changingPassword = true;
+		try {
+			await pb.collection('estore_users').update($user.id, {
+				password: newPassword,
+				passwordConfirm: newPassword,
+				oldPassword: currentPassword
+			});
+			toasts.show('success', 'Password changed successfully');
+			currentPassword = '';
+			newPassword = '';
+			confirmPassword = '';
+		} catch (e: any) {
+			toasts.show('error', e?.response?.message || 'Failed to change password');
+		} finally {
+			changingPassword = false;
+		}
+	}
+
+	function startEditingProfile() {
+		if ($user) {
+			profileName = $user.name || '';
+			profilePhone = $user.phone || '';
+		}
+		editingProfile = true;
 	}
 </script>
 
@@ -473,19 +541,121 @@
 					<h2 class="mb-6 text-xl font-semibold text-text-primary">Account Settings</h2>
 					<div class="space-y-6">
 						<div class="rounded-xl bg-bg-secondary p-6">
-							<h3 class="mb-4 font-medium text-text-primary">Account Information</h3>
-							<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-								<div>
-									<p class="text-sm text-text-muted">Name</p>
-									<p class="font-medium text-text-primary">
-										{$user.name || 'Not set'}
-									</p>
-								</div>
-								<div>
-									<p class="text-sm text-text-muted">Email</p>
-									<p class="font-medium text-text-primary">{$user.email}</p>
-								</div>
+							<div class="mb-4 flex items-center justify-between">
+								<h3 class="font-medium text-text-primary">Profile Information</h3>
+								{#if !editingProfile}
+									<Button variant="secondary" size="sm" onclick={startEditingProfile}>Edit</Button>
+								{/if}
 							</div>
+
+							{#if editingProfile}
+								<form
+									onsubmit={(e) => {
+										e.preventDefault();
+										saveProfile();
+									}}
+									class="space-y-4"
+								>
+									<div>
+										<label class="mb-1 block text-sm font-medium text-text-primary">Name</label>
+										<input
+											type="text"
+											bind:value={profileName}
+											class="w-full rounded-lg border border-border px-4 py-2 focus:border-accent focus:outline-none"
+										/>
+									</div>
+									<div>
+										<label class="mb-1 block text-sm font-medium text-text-primary">Phone</label>
+										<input
+											type="tel"
+											bind:value={profilePhone}
+											placeholder="Enter phone number"
+											class="w-full rounded-lg border border-border px-4 py-2 focus:border-accent focus:outline-none"
+										/>
+									</div>
+									<div class="flex gap-2">
+										<Button
+											variant="primary"
+											size="sm"
+											disabled={savingProfile}
+											onclick={saveProfile}
+										>
+											{savingProfile ? 'Saving...' : 'Save Changes'}
+										</Button>
+										<Button variant="ghost" size="sm" onclick={() => (editingProfile = false)}
+											>Cancel</Button
+										>
+									</div>
+								</form>
+							{:else}
+								<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+									<div>
+										<p class="text-sm text-text-muted">Name</p>
+										<p class="font-medium text-text-primary">{$user.name || 'Not set'}</p>
+									</div>
+									<div>
+										<p class="text-sm text-text-muted">Phone</p>
+										<p class="font-medium text-text-primary">{$user.phone || 'Not set'}</p>
+									</div>
+									<div>
+										<p class="text-sm text-text-muted">Email</p>
+										<p class="font-medium text-text-primary">{$user.email}</p>
+									</div>
+								</div>
+							{/if}
+						</div>
+
+						<div class="rounded-xl border border-border p-6">
+							<h3 class="mb-4 font-medium text-text-primary">Change Password</h3>
+							<form
+								onsubmit={(e) => {
+									e.preventDefault();
+									changePassword();
+								}}
+								class="space-y-4"
+							>
+								<div>
+									<label class="mb-1 block text-sm font-medium text-text-primary"
+										>Current Password</label
+									>
+									<input
+										type="password"
+										bind:value={currentPassword}
+										placeholder="Enter current password"
+										class="w-full rounded-lg border border-border px-4 py-2 focus:border-accent focus:outline-none"
+									/>
+								</div>
+								<div>
+									<label class="mb-1 block text-sm font-medium text-text-primary"
+										>New Password</label
+									>
+									<input
+										type="password"
+										bind:value={newPassword}
+										placeholder="Enter new password"
+										class="w-full rounded-lg border border-border px-4 py-2 focus:border-accent focus:outline-none"
+									/>
+								</div>
+								<div>
+									<label class="mb-1 block text-sm font-medium text-text-primary"
+										>Confirm Password</label
+									>
+									<input
+										type="password"
+										bind:value={confirmPassword}
+										placeholder="Confirm new password"
+										class="w-full rounded-lg border border-border px-4 py-2 focus:border-accent focus:outline-none"
+									/>
+								</div>
+								<Button
+									variant="primary"
+									size="sm"
+									disabled={changingPassword || !newPassword || !currentPassword}
+									onclick={changePassword}
+								>
+									{changingPassword ? 'Changing...' : 'Change Password'}
+								</Button>
+							</form>
 						</div>
 
 						<div class="rounded-xl border border-red-200 bg-red-50 p-6">
