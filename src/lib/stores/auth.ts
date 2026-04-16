@@ -11,7 +11,13 @@ let userSubscription: any = null;
 
 function cleanupUserSubscription() {
 	if (userSubscription) {
-		userSubscription.unsubscribe().catch(() => {});
+		try {
+			if (typeof userSubscription.unsubscribe === 'function') {
+				userSubscription.unsubscribe();
+			}
+		} catch (e) {
+			console.error('Error unsubscribing:', e);
+		}
 		userSubscription = null;
 	}
 }
@@ -116,11 +122,19 @@ export async function register(email: string, password: string, name: string) {
 }
 
 export async function logout() {
-	cleanupUserSubscription();
-	pb.authStore.clear();
-	user.set(null);
-	isAuthenticated.set(false);
-	isAdmin.set(false);
+	try {
+		cleanupUserSubscription();
+		pb.authStore.clear();
+		user.set(null);
+		isAuthenticated.set(false);
+		isAdmin.set(false);
+	} catch (error) {
+		console.error('Logout error:', error);
+		pb.authStore.clear();
+		user.set(null);
+		isAuthenticated.set(false);
+		isAdmin.set(false);
+	}
 }
 
 export function isUserAdmin(): boolean {

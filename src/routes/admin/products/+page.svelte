@@ -625,7 +625,7 @@
 	size="lg"
 	onclose={resetForm}
 >
-	<div class="max-h-[70vh] space-y-4 overflow-y-auto pr-2">
+	<div class="space-y-4">
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 			<Input
 				label="Product Name"
@@ -799,42 +799,42 @@
 					{isFetchingUrl ? 'Fetching...' : 'Add URL'}
 				</Button>
 			</div>
+
+			<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+				<Input
+					label="Available Colors (comma-separated)"
+					placeholder="e.g. Red, Blue, Black"
+					bind:value={form.colors}
+				/>
+				<Input
+					label="Available Sizes (comma-separated)"
+					placeholder="e.g. S, M, L, XL"
+					bind:value={form.sizes}
+				/>
+			</div>
+
+			<div class="flex items-center gap-3">
+				<input
+					type="checkbox"
+					id="featured"
+					bind:checked={form.featured}
+					class="h-5 w-5 rounded border-border text-accent focus:ring-accent"
+				/>
+				<label for="featured" class="text-sm font-medium text-text-primary">Featured Product</label>
+			</div>
 		</div>
 
-		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-			<Input
-				label="Available Colors (comma-separated)"
-				placeholder="e.g. Red, Blue, Black"
-				bind:value={form.colors}
-			/>
-			<Input
-				label="Available Sizes (comma-separated)"
-				placeholder="e.g. S, M, L, XL"
-				bind:value={form.sizes}
-			/>
+		<div class="mt-6 flex items-center justify-end gap-3 border-t border-border pt-4">
+			<Button
+				variant="ghost"
+				onclick={() => {
+					showModal = false;
+					resetForm();
+				}}>Cancel</Button
+			>
+			<Button variant="primary" loading={saving} onclick={handleSave}>
+				{saving ? 'Saving...' : editingProduct ? 'Update Product' : 'Create Product'}
+			</Button>
 		</div>
-
-		<div class="flex items-center gap-3">
-			<input
-				type="checkbox"
-				id="featured"
-				bind:checked={form.featured}
-				class="h-5 w-5 rounded border-border text-accent focus:ring-accent"
-			/>
-			<label for="featured" class="text-sm font-medium text-text-primary">Featured Product</label>
-		</div>
-	</div>
-
-	<div class="mt-6 flex items-center justify-end gap-3 border-t border-border pt-4">
-		<Button
-			variant="ghost"
-			onclick={() => {
-				showModal = false;
-				resetForm();
-			}}>Cancel</Button
-		>
-		<Button variant="primary" loading={saving} onclick={handleSave}>
-			{saving ? 'Saving...' : editingProduct ? 'Update Product' : 'Create Product'}
-		</Button>
 	</div>
 </Modal>

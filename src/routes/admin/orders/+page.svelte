@@ -151,11 +151,11 @@
 		</div>
 	{/if}
 
-	<div class="custom-scrollbar mb-6 flex gap-2 overflow-x-auto pb-2">
+	<div class="custom-scrollbar mb-6 grid grid-cols-3 gap-2 overflow-x-auto pb-2 sm:flex sm:gap-2">
 		{#each statuses as status}
 			<button
 				onclick={() => (activeFilter = status)}
-				class="rounded-xl px-4 py-2 text-sm font-medium capitalize transition-colors {activeFilter ===
+				class="rounded-xl px-3 py-2 text-xs font-medium capitalize transition-colors sm:px-4 sm:text-sm {activeFilter ===
 				status
 					? 'bg-accent text-white'
 					: 'border border-border bg-white text-text-secondary hover:bg-bg-secondary'}"

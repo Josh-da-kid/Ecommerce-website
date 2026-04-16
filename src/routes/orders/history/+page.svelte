@@ -121,9 +121,10 @@
 			</div>
 		</div>
 
-		<div class="mb-6 flex gap-2">
+		<div class="mb-6 grid grid-cols-3 gap-2">
 			<button
-				class="rounded-lg px-4 py-2 text-sm font-medium transition-colors {filter === 'all'
+				class="rounded-lg px-3 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm {filter ===
+				'all'
 					? 'bg-accent text-white'
 					: 'bg-white text-text-secondary hover:bg-bg-secondary'}"
 				onclick={() => (filter = 'all')}
@@ -131,7 +132,8 @@
 				All
 			</button>
 			<button
-				class="rounded-lg px-4 py-2 text-sm font-medium transition-colors {filter === 'delivered'
+				class="rounded-lg px-3 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm {filter ===
+				'delivered'
 					? 'bg-green-500 text-white'
 					: 'bg-white text-text-secondary hover:bg-bg-secondary'}"
 				onclick={() => (filter = 'delivered')}
@@ -139,7 +141,8 @@
 				Delivered
 			</button>
 			<button
-				class="rounded-lg px-4 py-2 text-sm font-medium transition-colors {filter === 'cancelled'
+				class="rounded-lg px-3 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm {filter ===
+				'cancelled'
 					? 'bg-red-500 text-white'
 					: 'bg-white text-text-secondary hover:bg-bg-secondary'}"
 				onclick={() => (filter = 'cancelled')}

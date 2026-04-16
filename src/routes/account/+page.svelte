@@ -12,6 +12,26 @@
 	let activeTab = $state<'profile' | 'orders' | 'settings'>('profile');
 	let orders = $state<Order[]>([]);
 
+	let processedOrdersTotal = $derived(
+		orders
+			.filter(
+				(o) => o.status === 'delivered' || o.status === 'processing' || o.status === 'shipped'
+			)
+			.reduce((s, o) => s + (o.total || 0), 0)
+	);
+
+	let processedOrders = $derived(
+		orders.filter(
+			(o) => o.status === 'delivered' || o.status === 'processing' || o.status === 'shipped'
+		)
+	);
+
+	let activeOrders = $derived(
+		orders.filter((o) => ['pending', 'processing', 'shipped'].includes(o.status)).length
+	);
+
+	let completedOrders = $derived(orders.filter((o) => o.status === 'delivered').length);
+
 	let editingProfile = $state(false);
 	let savingProfile = $state(false);
 	let profileName = $state('');
@@ -94,6 +114,7 @@
 
 	async function handleLogout() {
 		await logout();
+		await new Promise((resolve) => setTimeout(resolve, 100));
 		goto('/');
 	}
 
@@ -262,11 +283,13 @@
 					</div>
 
 					<div class="lg:col-span-2">
-						<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-							<div class="rounded-2xl bg-white p-6 shadow-sm">
-								<div class="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100">
+						<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+							<div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
+								<div
+									class="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 sm:h-12 sm:w-12"
+								>
 									<svg
-										class="h-6 w-6 text-blue-600"
+										class="h-5 w-5 text-blue-600 sm:h-6 sm:w-6"
 										fill="none"
 										stroke="currentColor"
 										viewBox="0 0 24 24"
@@ -279,65 +302,16 @@
 										/>
 									</svg>
 								</div>
-								<p class="text-sm text-text-secondary">Total Orders</p>
-								<p class="text-2xl font-bold text-text-primary">{orders.length}</p>
+								<p class="text-xs text-text-secondary sm:text-sm">Total Orders</p>
+								<p class="text-xl font-bold text-text-primary sm:text-2xl">{orders.length}</p>
 							</div>
 
-							<div class="rounded-2xl bg-white p-6 shadow-sm">
+							<div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
 								<div
-									class="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-green-100"
+									class="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 sm:h-12 sm:w-12"
 								>
 									<svg
-										class="h-6 w-6 text-green-600"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-										/>
-									</svg>
-								</div>
-								<p class="text-sm text-text-secondary">Total Spent</p>
-								<p class="text-2xl font-bold text-text-primary">
-									{formatPrice(orders.reduce((s, o) => s + (o.total || 0), 0))}
-								</p>
-							</div>
-
-							<div class="rounded-2xl bg-white p-6 shadow-sm">
-								<div
-									class="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100"
-								>
-									<svg
-										class="h-6 w-6 text-purple-600"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-										/>
-									</svg>
-								</div>
-								<p class="text-sm text-text-secondary">Active Orders</p>
-								<p class="text-2xl font-bold text-text-primary">
-									{orders.filter((o) => ['pending', 'processing', 'shipped'].includes(o.status))
-										.length}
-								</p>
-							</div>
-
-							<div class="rounded-2xl bg-white p-6 shadow-sm">
-								<div
-									class="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100"
-								>
-									<svg
-										class="h-6 w-6 text-amber-600"
+										class="h-5 w-5 text-indigo-600 sm:h-6 sm:w-6"
 										fill="none"
 										stroke="currentColor"
 										viewBox="0 0 24 24"
@@ -350,9 +324,81 @@
 										/>
 									</svg>
 								</div>
-								<p class="text-sm text-text-secondary">Completed</p>
-								<p class="text-2xl font-bold text-text-primary">
-									{orders.filter((o) => o.status === 'delivered').length}
+								<p class="text-xs text-text-secondary sm:text-sm">Processed</p>
+								<p class="text-xl font-bold text-text-primary sm:text-2xl">
+									{processedOrders.length}
+								</p>
+							</div>
+
+							<div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
+								<div
+									class="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-green-100 sm:h-12 sm:w-12"
+								>
+									<svg
+										class="h-5 w-5 text-green-600 sm:h-6 sm:w-6"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+										/>
+									</svg>
+								</div>
+								<p class="text-xs text-text-secondary sm:text-sm">Total Spent</p>
+								<p class="text-xl font-bold text-text-primary sm:text-2xl">
+									{formatPrice(processedOrdersTotal)}
+								</p>
+							</div>
+
+							<div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
+								<div
+									class="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 sm:h-12 sm:w-12"
+								>
+									<svg
+										class="h-5 w-5 text-purple-600 sm:h-6 sm:w-6"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+										/>
+									</svg>
+								</div>
+								<p class="text-xs text-text-secondary sm:text-sm">Active</p>
+								<p class="text-xl font-bold text-text-primary sm:text-2xl">
+									{activeOrders}
+								</p>
+							</div>
+
+							<div class="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
+								<div
+									class="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 sm:h-12 sm:w-12"
+								>
+									<svg
+										class="h-5 w-5 text-amber-600 sm:h-6 sm:w-6"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+										/>
+									</svg>
+								</div>
+								<p class="text-xs text-text-secondary sm:text-sm">Completed</p>
+								<p class="text-xl font-bold text-text-primary sm:text-2xl">
+									{completedOrders}
 								</p>
 							</div>
 						</div>
@@ -469,7 +515,7 @@
 				</div>
 			{:else if activeTab === 'orders'}
 				<div class="space-y-6">
-					{#if orders.length === 0}
+					{#if processedOrders.length === 0}
 						<div class="rounded-2xl bg-white py-16 text-center shadow-sm">
 							<svg
 								class="mx-auto mb-4 h-16 w-16 text-text-muted"
@@ -484,14 +530,14 @@
 									d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
 								/>
 							</svg>
-							<h3 class="text-lg font-semibold text-text-primary">No orders yet</h3>
-							<p class="mt-1 text-text-secondary">Your order history will appear here.</p>
+							<h3 class="text-lg font-semibold text-text-primary">No processed orders yet</h3>
+							<p class="mt-1 text-text-secondary">Your completed orders will appear here.</p>
 							<a href="/products" class="mt-4 inline-block">
 								<Button variant="primary">Start Shopping</Button>
 							</a>
 						</div>
 					{:else}
-						{#each orders as order}
+						{#each processedOrders as order}
 							<div class="rounded-2xl bg-white shadow-sm">
 								<div
 									class="flex flex-wrap items-center justify-between gap-4 border-b border-border px-6 py-4"

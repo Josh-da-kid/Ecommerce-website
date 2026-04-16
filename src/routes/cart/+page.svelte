@@ -176,8 +176,8 @@
 				</a>
 			</div>
 		{:else}
-			<div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-				<div class="space-y-6 lg:col-span-2">
+			<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+				<div class="space-y-4 lg:col-span-2">
 					{#each $cart as item (`${item.product.id}-${item.color}-${item.size}`)}
 						{@const stock = getCurrentStock(item.product.id)}
 						{@const isOverStock = item.quantity > stock}
@@ -185,13 +185,14 @@
 						{@const sizeAvailable = isSizeAvailable(item.product.id, item.size)}
 						{@const isUnavailable = !colorAvailable || !sizeAvailable}
 						<div
-							class="flex gap-6 rounded-2xl bg-white p-6 shadow-lg {isOverStock || isUnavailable
+							class="flex flex-col gap-4 rounded-2xl bg-white p-4 shadow-lg sm:flex-row sm:p-6 {isOverStock ||
+							isUnavailable
 								? 'ring-2 ring-error/50'
 								: ''}"
 						>
 							<a
 								href="/products/{item.product.id}"
-								class="h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-bg-secondary"
+								class="h-28 w-full flex-shrink-0 overflow-hidden rounded-xl bg-bg-secondary sm:h-32 sm:w-32"
 							>
 								<img
 									src={getProductImage(item.product)}
@@ -202,23 +203,25 @@
 
 							<div class="flex-1">
 								<div class="mb-2 flex items-start justify-between">
-									<div>
+									<div class="min-w-0 flex-1">
 										<a
 											href="/products/{item.product.id}"
-											class="text-lg font-semibold text-text-primary hover:text-accent"
+											class="text-base font-semibold text-text-primary hover:text-accent sm:text-lg"
 										>
 											{item.product.name}
 										</a>
-										<div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
+										<div
+											class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-text-secondary sm:text-sm"
+										>
 											{#if item.color}
 												<span
-													class="inline-flex items-center rounded-full bg-bg-secondary px-2.5 py-0.5 text-xs font-medium"
+													class="inline-flex items-center rounded-full bg-bg-secondary px-2 py-0.5"
 													>{item.color}</span
 												>
 											{/if}
 											{#if item.size}
 												<span
-													class="inline-flex items-center rounded-full bg-bg-secondary px-2.5 py-0.5 text-xs font-medium"
+													class="inline-flex items-center rounded-full bg-bg-secondary px-2 py-0.5"
 													>{item.size}</span
 												>
 											{/if}
@@ -259,13 +262,20 @@
 									</p>
 								{/if}
 
-								<div class="mt-4 flex items-center justify-between">
-									<div class="flex items-center rounded-xl border border-border">
+								<div
+									class="mt-3 flex w-fit flex-col gap-3 sm:mt-4 sm:flex-row sm:items-center sm:justify-between"
+								>
+									<div class="flex w-fit items-center rounded-xl border border-border">
 										<button
-											class="flex h-10 w-10 items-center justify-center transition-colors hover:bg-bg-secondary"
+											class="flex h-8 w-8 items-center justify-center transition-colors hover:bg-bg-secondary sm:h-10 sm:w-10"
 											onclick={() => updateQuantity(item.product.id, -1, item.color, item.size)}
 										>
-											<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<svg
+												class="h-3 w-3 sm:h-4 sm:w-4"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+											>
 												<path
 													stroke-linecap="round"
 													stroke-linejoin="round"
@@ -274,16 +284,21 @@
 												/>
 											</svg>
 										</button>
-										<span class="w-10 text-center font-medium">{item.quantity}</span>
+										<span class="w-8 text-center text-sm font-medium sm:w-10">{item.quantity}</span>
 										<button
-											class="flex h-10 w-10 items-center justify-center transition-colors hover:bg-bg-secondary {item.quantity >=
+											class="flex h-8 w-8 items-center justify-center transition-colors hover:bg-bg-secondary sm:h-10 sm:w-10 {item.quantity >=
 											stock
 												? 'cursor-not-allowed opacity-30'
 												: ''}"
 											onclick={() => updateQuantity(item.product.id, 1, item.color, item.size)}
 											disabled={item.quantity >= stock}
 										>
-											<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<svg
+												class="h-3 w-3 sm:h-4 sm:w-4"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+											>
 												<path
 													stroke-linecap="round"
 													stroke-linejoin="round"
@@ -295,11 +310,11 @@
 									</div>
 
 									<div class="text-right">
-										<p class="text-xl font-bold text-accent">
+										<p class="text-lg font-bold text-accent sm:text-xl">
 											{formatPrice(getCurrentPrice(item.product.id) * item.quantity)}
 										</p>
 										{#if getCurrentComparePrice(item.product.id)}
-											<p class="text-sm text-text-muted line-through">
+											<p class="text-xs text-text-muted line-through sm:text-sm">
 												{formatPrice(
 													(getCurrentComparePrice(item.product.id) ?? 0) * item.quantity
 												)}
@@ -313,45 +328,47 @@
 				</div>
 
 				<div class="lg:col-span-1">
-					<div class="sticky top-24 rounded-2xl bg-white p-6 shadow-lg">
-						<h2 class="mb-6 text-xl font-semibold text-text-primary">Order Summary</h2>
+					<div class="sticky top-24 rounded-2xl bg-white p-4 shadow-lg sm:p-6">
+						<h2 class="mb-4 text-lg font-semibold text-text-primary sm:mb-6 sm:text-xl">
+							Order Summary
+						</h2>
 
-						<div class="mb-6 space-y-4">
-							<div class="flex justify-between text-text-secondary">
+						<div class="mb-4 space-y-3 sm:mb-6 sm:space-y-4">
+							<div class="flex justify-between text-sm text-text-secondary">
 								<span>Subtotal</span>
 								<span>{formatPrice(liveCartSubtotal)}</span>
 							</div>
 							{#if liveCartSavings > 0}
-								<div class="flex justify-between text-success">
+								<div class="flex justify-between text-sm text-success">
 									<span>Savings</span>
 									<span>-{formatPrice(liveCartSavings)}</span>
 								</div>
 							{/if}
-							<div class="flex justify-between text-text-secondary">
+							<div class="flex justify-between text-sm text-text-secondary">
 								<span>Shipping</span>
-								<span>Calculated at checkout</span>
+								<span class="text-xs">Calculated at checkout</span>
 							</div>
 						</div>
 
-						<div class="mb-6 border-t border-border pt-4">
+						<div class="mb-4 border-t border-border pt-4 sm:mb-6">
 							<div class="mb-2 flex gap-2">
 								<input
 									type="text"
 									bind:value={promoCode}
 									placeholder="Promo code"
-									class="h-12 flex-1 rounded-xl border border-border px-4 focus:border-accent focus:outline-none"
+									class="h-10 flex-1 rounded-lg border border-border px-3 text-sm focus:border-accent focus:outline-none sm:h-12 sm:px-4"
 								/>
-								<Button variant="secondary" size="md" onclick={handleApplyPromo}>Apply</Button>
+								<Button variant="secondary" size="sm" onclick={handleApplyPromo}>Apply</Button>
 							</div>
 							{#if promoApplied}
-								<p class="text-sm text-success">20% discount applied!</p>
+								<p class="text-xs text-success">20% discount applied!</p>
 							{/if}
 						</div>
 
-						<div class="mb-6 border-t border-border pt-4">
+						<div class="mb-4 border-t border-border pt-4 sm:mb-6">
 							<div class="flex items-center justify-between">
-								<span class="text-lg font-semibold">Total</span>
-								<span class="text-2xl font-bold text-accent">
+								<span class="text-base font-semibold sm:text-lg">Total</span>
+								<span class="text-xl font-bold text-accent sm:text-2xl">
 									{formatPrice(finalTotal)}
 								</span>
 							</div>

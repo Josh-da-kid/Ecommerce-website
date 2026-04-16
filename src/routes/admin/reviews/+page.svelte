@@ -55,9 +55,10 @@
 	>
 		<h1 class="text-2xl font-bold text-text-primary md:text-3xl">Reviews</h1>
 
-		<div class="custom-scrollbar flex gap-2 overflow-x-auto pb-2">
+		<div class="custom-scrollbar grid grid-cols-3 gap-2 overflow-x-auto pb-2 sm:flex sm:gap-2">
 			<button
-				class="rounded-lg px-4 py-2 text-sm font-medium transition-colors {filter === 'all'
+				class="rounded-lg px-3 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm {filter ===
+				'all'
 					? 'bg-accent text-white'
 					: 'bg-white text-text-secondary hover:bg-bg-secondary'}"
 				onclick={() => (filter = 'all')}
@@ -65,7 +66,8 @@
 				All ({reviews.length})
 			</button>
 			<button
-				class="rounded-lg px-4 py-2 text-sm font-medium transition-colors {filter === 'pending'
+				class="rounded-lg px-3 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm {filter ===
+				'pending'
 					? 'bg-amber-500 text-white'
 					: 'bg-white text-text-secondary hover:bg-bg-secondary'}"
 				onclick={() => (filter = 'pending')}
@@ -73,7 +75,8 @@
 				Pending ({reviews.filter((r) => !r.approved).length})
 			</button>
 			<button
-				class="rounded-lg px-4 py-2 text-sm font-medium transition-colors {filter === 'approved'
+				class="rounded-lg px-3 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm {filter ===
+				'approved'
 					? 'bg-green-500 text-white'
 					: 'bg-white text-text-secondary hover:bg-bg-secondary'}"
 				onclick={() => (filter = 'approved')}
