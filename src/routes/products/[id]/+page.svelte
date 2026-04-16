@@ -187,7 +187,7 @@
 </script>
 
 <svelte:head>
-	<title>{product?.name || 'Product'} - Luxe Store</title>
+	<title>{product?.name || 'Product'} - Urazbox</title>
 </svelte:head>
 
 {#if product}

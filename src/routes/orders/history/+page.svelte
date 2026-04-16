@@ -76,7 +76,7 @@
 </script>
 
 <svelte:head>
-	<title>Order History - Luxe Store</title>
+	<title>Order History - Urazbox</title>
 </svelte:head>
 
 <div class="min-h-screen bg-bg-primary pt-24 pb-16">

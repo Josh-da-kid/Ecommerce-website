@@ -78,7 +78,7 @@
 </script>
 
 <svelte:head>
-	<title>Orders - Admin - Luxe Store</title>
+	<title>Orders - Admin - Urazbox</title>
 </svelte:head>
 
 <div>

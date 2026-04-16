@@ -46,7 +46,7 @@
 </script>
 
 <svelte:head>
-	<title>Reviews - Admin - Luxe Store</title>
+	<title>Reviews - Admin - Urazbox</title>
 </svelte:head>
 
 <div>

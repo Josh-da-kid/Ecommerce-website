@@ -28,7 +28,7 @@
 </script>
 
 <svelte:head>
-	<title>Wishlist - Luxe Store</title>
+	<title>Wishlist - Urazbox</title>
 </svelte:head>
 
 <div class="min-h-screen bg-bg-primary pt-24 pb-16">

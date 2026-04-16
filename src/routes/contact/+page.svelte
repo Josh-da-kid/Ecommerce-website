@@ -25,7 +25,7 @@
 </script>
 
 <svelte:head>
-	<title>Contact Us - Luxe Store</title>
+	<title>Contact Us - Urazbox</title>
 </svelte:head>
 
 <div class="min-h-screen bg-bg-primary pt-24 pb-16">

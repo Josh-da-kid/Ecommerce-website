@@ -32,7 +32,7 @@
 		const result = await register(email, password, name);
 
 		if (result.success) {
-			toasts.show('success', 'Welcome to Luxe!');
+			toasts.show('success', 'Welcome to Urazbox!');
 			goto('/');
 		} else {
 			error = result.error || 'Registration failed';

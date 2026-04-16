@@ -29,7 +29,7 @@
 </script>
 
 <svelte:head>
-	<title>Login - Luxe Store</title>
+	<title>Login - Urazbox</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center bg-bg-primary pt-24 pb-16">

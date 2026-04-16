@@ -103,7 +103,7 @@
 </script>
 
 <svelte:head>
-	<title>My Orders - Luxe Store</title>
+	<title>My Orders - Urazbox</title>
 </svelte:head>
 
 <div class="min-h-screen bg-bg-primary pt-24 pb-16">

@@ -175,7 +175,7 @@
 </script>
 
 <svelte:head>
-	<title>Analytics - Admin - Luxe Store</title>
+	<title>Analytics - Admin - Urazbox</title>
 </svelte:head>
 
 {#if loading}

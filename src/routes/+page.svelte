@@ -38,7 +38,7 @@
 </script>
 
 <svelte:head>
-	<title>Luxe Store - Premium E-Commerce</title>
+	<title>Urazbox - Premium E-Commerce</title>
 	<meta
 		name="description"
 		content="Elevate your style with our curated collection of premium products."
@@ -190,7 +190,7 @@
 					<input
 						type="email"
 						placeholder="Enter your email"
-						class="h-14 flex-1 rounded-xl border border-white/20 bg-white/10 px-6 text-white placeholder:text-gray-400 focus:border-accent focus:outline-none"
+						class="h-14 flex-1 rounded-xl border border-white/20 bg-white/10 px-6 py-4 text-white placeholder:text-gray-400 focus:border-accent focus:outline-none"
 					/>
 					<Button variant="primary" size="lg">Subscribe</Button>
 				</form>
