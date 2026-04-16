@@ -144,7 +144,9 @@
 
 		if (browser) {
 			try {
-				const stockEntries: Record<string, { qty: number; fresh: Product }> = {};
+				const stockEntries: Record<string, { qty: number; fresh: Product; item: any }> = {};
+				const errors: string[] = [];
+
 				for (const item of $cart) {
 					const existing = stockEntries[item.product.id];
 					const totalQty = (existing?.qty || 0) + item.quantity;
@@ -152,8 +154,47 @@
 						existing.qty = totalQty;
 					} else {
 						const fresh = await pb.collection('estore_products').getOne<Product>(item.product.id);
-						stockEntries[item.product.id] = { qty: totalQty, fresh };
+
+						if (!fresh) {
+							errors.push(`"${item.product.name}" is no longer available.`);
+							continue;
+						}
+
+						if (
+							item.color &&
+							fresh.colors &&
+							Array.isArray(fresh.colors) &&
+							!fresh.colors.includes(item.color)
+						) {
+							errors.push(
+								`Color "${item.color}" is no longer available for "${item.product.name}".`
+							);
+							continue;
+						}
+
+						if (
+							item.size &&
+							fresh.sizes &&
+							Array.isArray(fresh.sizes) &&
+							!fresh.sizes.includes(item.size)
+						) {
+							errors.push(`Size "${item.size}" is no longer available for "${item.product.name}".`);
+							continue;
+						}
+
+						if (fresh.price !== item.product.price) {
+							errors.push(`Price for "${item.product.name}" has changed. Please refresh the page.`);
+							continue;
+						}
+
+						stockEntries[item.product.id] = { qty: totalQty, fresh, item };
 					}
+				}
+
+				if (errors.length > 0) {
+					toasts.show('error', errors[0]);
+					isProcessing = false;
+					return;
 				}
 
 				for (const pid of Object.keys(stockEntries)) {

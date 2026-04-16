@@ -1,16 +1,53 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { cart, cartTotal, cartSubtotal, cartSavings } from '$lib/stores';
+	import { products } from '$lib/stores/products';
 	import { Button } from '$lib/components/ui';
 	import { formatPrice } from '$lib/utils/index';
 	import { getProductImage } from '$lib/stores/products';
 	import { pb, type Product } from '$lib/pocketbase';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
+	import { toasts } from '$lib/stores/toast';
 
 	let promoCode = $state('');
 	let promoApplied = $state(false);
 	let productStocks = $state<Record<string, number>>({});
+
+	function getLiveProduct(productId: string): Product | undefined {
+		return $products.find((p) => p.id === productId);
+	}
+
+	function getCurrentPrice(productId: string): number {
+		const live = getLiveProduct(productId);
+		return live?.price ?? 0;
+	}
+
+	function getCurrentComparePrice(productId: string): number | undefined {
+		const live = getLiveProduct(productId);
+		return live?.comparePrice ?? undefined;
+	}
+
+	function formatPriceSafe(value: number | undefined): string {
+		return formatPrice(value ?? 0);
+	}
+
+	let liveCartTotal = $derived(
+		($cart ?? []).reduce((sum, item) => {
+			const livePrice = getCurrentPrice(item.product.id);
+			return sum + livePrice * item.quantity;
+		}, 0)
+	);
+
+	let liveCartSubtotal = $derived(
+		($cart ?? []).reduce((sum, item) => {
+			const liveComparePrice = getCurrentComparePrice(item.product.id);
+			const price = liveComparePrice || getCurrentPrice(item.product.id);
+			return sum + price * item.quantity;
+		}, 0)
+	);
+
+	let liveCartSavings = $derived(liveCartSubtotal - liveCartTotal);
 
 	function handleApplyPromo() {
 		if (promoCode.toLowerCase() === 'luxe20') {
@@ -34,7 +71,7 @@
 		}
 	}
 
-	let finalTotal = $derived(promoApplied ? $cartTotal * 0.8 : $cartTotal);
+	let finalTotal = $derived(promoApplied ? liveCartTotal * 0.8 : liveCartTotal);
 
 	async function refreshStocks() {
 		const stocks: Record<string, number> = {};
@@ -202,11 +239,13 @@
 
 									<div class="text-right">
 										<p class="text-xl font-bold text-accent">
-											{formatPrice(item.product.price * item.quantity)}
+											{formatPrice(getCurrentPrice(item.product.id) * item.quantity)}
 										</p>
-										{#if item.product.comparePrice}
+										{#if getCurrentComparePrice(item.product.id)}
 											<p class="text-sm text-text-muted line-through">
-												{formatPrice(item.product.comparePrice * item.quantity)}
+												{formatPrice(
+													(getCurrentComparePrice(item.product.id) ?? 0) * item.quantity
+												)}
 											</p>
 										{/if}
 									</div>
@@ -223,12 +262,12 @@
 						<div class="mb-6 space-y-4">
 							<div class="flex justify-between text-text-secondary">
 								<span>Subtotal</span>
-								<span>{formatPrice($cartSubtotal)}</span>
+								<span>{formatPrice(liveCartSubtotal)}</span>
 							</div>
-							{#if $cartSavings > 0}
+							{#if liveCartSavings > 0}
 								<div class="flex justify-between text-success">
 									<span>Savings</span>
-									<span>-{formatPrice($cartSavings)}</span>
+									<span>-{formatPrice(liveCartSavings)}</span>
 								</div>
 							{/if}
 							<div class="flex justify-between text-text-secondary">

@@ -86,6 +86,10 @@
 	let averageOrderValue = $derived(processedOrders > 0 ? totalRevenue / processedOrders : 0);
 	let totalOrders = $derived(orders.length);
 
+	let processedOrdersList = $derived(
+		orders.filter((o) => ['processing', 'shipped', 'delivered'].includes(o.status))
+	);
+
 	let monthlyRevenueData = $derived(() => {
 		const months: { label: string; revenue: number; shortLabel: string }[] = [];
 		const now = new Date();
@@ -95,12 +99,13 @@
 			const month = d.getMonth();
 			const label = d.toLocaleString('default', { month: 'short', year: '2-digit' });
 			const shortLabel = d.toLocaleString('default', { month: 'short' });
-			const revenue = orders
-				.filter((o) => {
-					const od = new Date(o.created);
-					return od.getFullYear() === year && od.getMonth() === month;
-				})
-				.reduce((sum, o) => sum + (o.total || 0), 0);
+
+			const monthOrders = processedOrdersList.filter((o) => {
+				const orderDate = new Date(o.created);
+				return orderDate.getFullYear() === year && orderDate.getMonth() === month;
+			});
+
+			const revenue = monthOrders.reduce((sum, o) => sum + (o.total || 0), 0);
 			months.push({ label, revenue, shortLabel });
 		}
 		return months;
@@ -147,7 +152,7 @@
 
 	let topProducts = $derived(() => {
 		const productCounts: Record<string, { name: string; count: number }> = {};
-		for (const o of orders) {
+		for (const o of processedOrdersList) {
 			for (const item of o.items || []) {
 				if (!productCounts[item.productId]) {
 					productCounts[item.productId] = { name: item.productName, count: 0 };
@@ -163,7 +168,7 @@
 	let topProductsList = $derived(topProducts());
 	let maxProductCount = $derived(Math.max(...topProductsList.map((p) => p.count), 1));
 
-	let recentOrders = $derived(orders.slice(0, 10));
+	let recentOrders = $derived(processedOrdersList.slice(0, 10));
 
 	function getStatusIcon(status: string): string {
 		switch (status) {
