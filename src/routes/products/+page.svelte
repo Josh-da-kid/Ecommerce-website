@@ -14,6 +14,8 @@
 
 	let searchValue = $state('');
 	let showFilters = $state(false);
+	let searchFocused = $state(false);
+	let searchInputEl: HTMLInputElement;
 
 	const handleSearch = debounce((value: string) => {
 		searchQuery.set(value);
@@ -28,6 +30,28 @@
 	function selectCategory(categoryId: string | null) {
 		selectedCategory.set(categoryId);
 	}
+
+	function focusSearchInput() {
+		searchFocused = true;
+		showFilters = true;
+		setTimeout(() => {
+			if (searchInputEl) {
+				searchInputEl.focus();
+				searchInputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}
+		}, 100);
+	}
+
+	function handleSearchBlur() {
+		searchFocused = false;
+	}
+
+	$effect(() => {
+		const focus = $page.url.searchParams.get('focus');
+		if (focus === 'search') {
+			focusSearchInput();
+		}
+	});
 </script>
 
 <svelte:head>
@@ -51,16 +75,20 @@
 					</Button>
 				</div>
 
-				<div class="space-y-8 {showFilters ? 'block' : 'hidden lg:block'}">
+				<div class="space-y-8 {showFilters ? 'block' : 'block lg:block'}">
 					<div>
 						<h3 class="mb-4 font-semibold text-text-primary">Search</h3>
 						<div class="relative">
 							<input
+								bind:this={searchInputEl}
 								type="search"
 								placeholder="Search products..."
 								value={searchValue}
 								oninput={handleSearchInput}
-								class="h-12 w-full rounded-xl border border-border bg-white pr-4 pl-12 focus:border-accent focus:outline-none"
+								onblur={handleSearchBlur}
+								class="h-12 w-full rounded-xl border-2 bg-white pr-4 pl-12 transition-all duration-200 {searchFocused
+									? 'scale-105 border-accent ring-2 ring-accent/30'
+									: 'border-border hover:border-accent/50 focus:border-accent focus:outline-none'}"
 							/>
 							<svg
 								class="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-text-muted"

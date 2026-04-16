@@ -4,6 +4,7 @@
 	import { Button, Badge } from '$lib/components/ui';
 	import { ProductCard } from '$lib/components/product';
 	import { cart, wishlist } from '$lib/stores';
+	import { user, isAuthenticated } from '$lib/stores/auth';
 	import { toasts } from '$lib/stores/toast';
 	import {
 		getProductImage,
@@ -12,7 +13,12 @@
 		products
 	} from '$lib/stores/products';
 	import { formatPrice } from '$lib/utils/index';
-	import { type Product } from '$lib/pocketbase';
+	import { type Product, type Review } from '$lib/pocketbase';
+	import {
+		fetchProductReviews,
+		getUnreviewedOrdersForProduct,
+		submitReview
+	} from '$lib/stores/reviews';
 
 	let product = $state<Product | null>(null);
 	let quantity = $state(1);
@@ -22,6 +28,17 @@
 	let selectedColor = $state('');
 	let selectedSize = $state('');
 	let variantError = $state('');
+
+	let productReviews = $state<Review[]>([]);
+	let loadingReviews = $state(true);
+	let canReview = $state(false);
+	let availableOrders = $state<string[]>([]);
+	let selectedOrderId = $state('');
+	let reviewRating = $state(5);
+	let reviewTitle = $state('');
+	let reviewComment = $state('');
+	let titleError = $state('');
+	let isSubmittingReview = $state(false);
 
 	const productId = $page.params.id;
 
@@ -42,6 +59,7 @@
 	let needsSize = $derived(availableSizes.length > 0);
 
 	onMount(async () => {
+		if (!productId) return;
 		const fetched = await fetchProductById(productId);
 		if (fetched) {
 			product = fetched;
@@ -51,7 +69,29 @@
 				if (found) product = found;
 			});
 		}
+
+		productReviews = await fetchProductReviews(productId);
+		loadingReviews = false;
+
+		if ($isAuthenticated && $user) {
+			availableOrders = await getUnreviewedOrdersForProduct($user.id, productId);
+			canReview = availableOrders.length > 0;
+			if (availableOrders.length > 0) {
+				selectedOrderId = availableOrders[0];
+			}
+		}
 	});
+
+	let avgRating = $derived(
+		productReviews.length > 0
+			? productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length
+			: 0
+	);
+	let hasFiveStars = $derived(productReviews.some((r) => r.rating === 5));
+	let hasFourStars = $derived(productReviews.some((r) => r.rating === 4));
+	let hasThreeStars = $derived(productReviews.some((r) => r.rating === 3));
+	let hasTwoStars = $derived(productReviews.some((r) => r.rating === 2));
+	let hasOneStar = $derived(productReviews.some((r) => r.rating === 1));
 
 	function handleAddToCart() {
 		if (!product) return;
@@ -95,6 +135,36 @@
 		const wasInWishlist = wishlistValue.includes(product.id);
 		wishlist.toggle(product.id);
 		toasts.show('info', wasInWishlist ? 'Removed from wishlist' : 'Added to wishlist');
+	}
+
+	async function handleSubmitReview() {
+		titleError = '';
+		if (!reviewTitle.trim()) {
+			titleError = 'Review title is required';
+			return;
+		}
+		if (!selectedOrderId || !product) return;
+
+		isSubmittingReview = true;
+		try {
+			await submitReview(
+				selectedOrderId,
+				product.id,
+				reviewRating,
+				reviewComment,
+				$user!.id,
+				reviewTitle
+			);
+			toasts.show('success', 'Review submitted! It will be visible after approval.');
+			canReview = false;
+			reviewTitle = '';
+			reviewComment = '';
+			reviewRating = 5;
+		} catch (_e: unknown) {
+			toasts.show('error', 'Failed to submit review');
+		} finally {
+			isSubmittingReview = false;
+		}
 	}
 
 	let wishlistValue = $state<string[]>([]);
@@ -240,6 +310,32 @@
 							</span>
 						{/if}
 					</div>
+
+					{#if productReviews.length > 0}
+						<div class="mb-4 flex items-center gap-2">
+							<div class="flex text-amber-400">
+								{#each [1, 2, 3, 4, 5] as star}
+									<svg
+										class="h-5 w-5 {star <= Math.round(avgRating)
+											? 'fill-current'
+											: 'text-gray-300'}"
+										fill="currentColor"
+										viewBox="0 0 20 20"
+									>
+										<path
+											d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+										/>
+									</svg>
+								{/each}
+							</div>
+							<span class="text-sm font-medium text-text-primary">
+								{avgRating.toFixed(1)}
+							</span>
+							<span class="text-sm text-text-muted">
+								({productReviews.length} review{productReviews.length !== 1 ? 's' : ''})
+							</span>
+						</div>
+					{/if}
 
 					<div
 						class="mb-4 text-sm font-medium {isOutOfStock
@@ -439,22 +535,166 @@
 						<p class="leading-relaxed text-text-secondary">{product.description}</p>
 					</div>
 				{:else if activeTab === 'reviews'}
-					<div class="py-12 text-center">
-						<svg
-							class="mx-auto mb-4 h-16 w-16 text-text-muted"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="1"
-								d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-							/>
-						</svg>
-						<p class="text-text-secondary">No reviews yet. Be the first to review this product!</p>
-					</div>
+					{#if loadingReviews}
+						<div class="py-12 text-center">
+							<div
+								class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent"
+							></div>
+						</div>
+					{:else if productReviews.length === 0}
+						<div class="py-12 text-center">
+							<svg
+								class="mx-auto mb-4 h-16 w-16 text-text-muted"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="1"
+									d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+								/>
+							</svg>
+							<p class="text-text-secondary">
+								No reviews yet. Be the first to review this product!
+							</p>
+						</div>
+					{:else}
+						<div class="space-y-6">
+							{#if canReview && $isAuthenticated}
+								<div class="rounded-2xl border-2 border-accent/30 bg-accent/5 p-6">
+									<h3 class="mb-4 font-semibold text-text-primary">Write a Review</h3>
+									<p class="mb-4 text-sm text-text-secondary">
+										You have {availableOrders.length} order(s) you can review.
+									</p>
+
+									{#if availableOrders.length > 1}
+										<div class="mb-4">
+											<label class="mb-2 block text-sm font-medium text-text-primary">
+												Select order to review
+											</label>
+											<select
+												bind:value={selectedOrderId}
+												class="h-12 w-full rounded-xl border border-border px-4 focus:border-accent focus:outline-none"
+											>
+												{#each availableOrders as orderId}
+													<option value={orderId}>Order #{orderId.slice(0, 8)}</option>
+												{/each}
+											</select>
+										</div>
+									{/if}
+
+									<div class="mb-4">
+										<label class="mb-2 block text-sm font-medium text-text-primary">
+											Review Title <span class="text-error">*</span>
+										</label>
+										<input
+											type="text"
+											bind:value={reviewTitle}
+											placeholder="e.g., Amazing quality!"
+											class="w-full rounded-xl border border-border px-4 py-3 focus:border-accent focus:outline-none"
+										/>
+										{#if titleError}
+											<p class="mt-1 text-sm text-error">{titleError}</p>
+										{/if}
+									</div>
+
+									<div class="mb-4">
+										<label class="mb-2 block text-sm font-medium text-text-primary">Rating</label>
+										<div class="flex gap-2">
+											{#each [1, 2, 3, 4, 5] as star}
+												<button
+													type="button"
+													class="text-2xl transition-colors {reviewRating >= star
+														? 'text-amber-400'
+														: 'text-gray-300'}"
+													onclick={() => (reviewRating = star)}
+												>
+													★
+												</button>
+											{/each}
+										</div>
+									</div>
+
+									<div class="mb-4">
+										<label class="mb-2 block text-sm font-medium text-text-primary">
+											Comment (optional)
+										</label>
+										<textarea
+											bind:value={reviewComment}
+											placeholder="Share your experience with this product..."
+											rows="3"
+											class="w-full resize-none rounded-xl border border-border px-4 py-3 focus:border-accent focus:outline-none"
+										></textarea>
+									</div>
+
+									<Button
+										variant="primary"
+										disabled={isSubmittingReview}
+										onclick={handleSubmitReview}
+									>
+										{isSubmittingReview ? 'Submitting...' : 'Submit Review'}
+									</Button>
+								</div>
+							{/if}
+
+							<div class="mb-6 flex items-center gap-4">
+								<div class="text-3xl font-bold text-text-primary">{avgRating.toFixed(1)}</div>
+								<div class="flex text-amber-400">
+									{#each [1, 2, 3, 4, 5] as star}
+										<svg
+											class="h-5 w-5 {star <= Math.round(avgRating)
+												? 'fill-current'
+												: 'text-gray-300'}"
+											fill="currentColor"
+											viewBox="0 0 20 20"
+										>
+											<path
+												d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+											/>
+										</svg>
+									{/each}
+								</div>
+								<span class="text-text-muted">({productReviews.length} reviews)</span>
+							</div>
+
+							{#each productReviews as review}
+								<div class="rounded-xl border border-border p-6">
+									<div class="flex items-center justify-between">
+										<div class="flex items-center gap-2">
+											<span class="font-semibold text-text-primary">
+												{review.title}
+											</span>
+											<span
+												class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
+											>
+												<svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+													<path
+														fill-rule="evenodd"
+														d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+														clip-rule="evenodd"
+													/>
+												</svg>
+												Verified Purchase
+											</span>
+										</div>
+										<div class="flex text-amber-400">
+											{#each Array(review.rating) as _}
+												<span>★</span>
+											{/each}
+										</div>
+									</div>
+									{#if review.comment}
+										<p class="mt-2 text-text-secondary">{review.comment}</p>
+									{/if}
+									<p class="mt-2 text-xs text-text-muted">
+										{new Date(review.created).toLocaleDateString()}
+									</p>
+								</div>
+							{/each}
+						</div>
+					{/if}
 				{:else}
 					<div class="grid grid-cols-1 gap-8 md:grid-cols-2">
 						<div class="rounded-2xl bg-white p-6">

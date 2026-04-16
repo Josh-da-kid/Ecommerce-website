@@ -286,6 +286,21 @@
 					}
 				},
 				{
+					"name": "order",
+					"type": "relation",
+					"required": true,
+					"options": {
+						"collectionId": "orders",
+						"cascadeDelete": false,
+						"maxSelect": 1
+					}
+				},
+				{
+					"name": "title",
+					"type": "text",
+					"required": true
+				},
+				{
 					"name": "rating",
 					"type": "number",
 					"required": true,

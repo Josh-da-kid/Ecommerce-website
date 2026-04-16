@@ -49,6 +49,8 @@ export interface Product {
 	featured: boolean;
 	created: string;
 	updated: string;
+	rating?: number;
+	reviewCount?: number;
 }
 
 export function parseImages(images: string | string[] | undefined): string[] {
@@ -124,4 +126,22 @@ export function getProductImages(product: Product): string[] {
 		if (img.startsWith('http')) return img;
 		return getImageUrl('estore_products', product.id, img);
 	});
+}
+
+export interface Review {
+	id: string;
+	user: string;
+	product: string;
+	order: string;
+	title: string;
+	rating: number;
+	comment: string;
+	approved: boolean;
+	created: string;
+	updated: string;
+	expand?: {
+		user?: User;
+		product?: Product;
+		order?: Order;
+	};
 }
