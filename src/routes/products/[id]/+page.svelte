@@ -45,24 +45,69 @@
 	let allImages = $derived(product ? getProductImages(product) : ['/placeholder-product.svg']);
 	let totalSlides = $derived(allImages.length);
 
-	let productVideos = $derived(() => {
-		if (!product?.videos) return [];
-		const v = product.videos;
+	let productVideo = $derived(() => {
+		if (!product?.video) return '';
+		return product.video;
+	});
+
+	let productVideoUrls = $derived(() => {
+		if (!product?.videoUrls) return [];
+		const v = product.videoUrls;
 		if (Array.isArray(v)) return v;
-		if (typeof v === 'string' && v.trim()) {
-			try {
-				const parsed = JSON.parse(v);
-				if (Array.isArray(parsed)) return parsed;
-			} catch {}
-			return v
-				.split(',')
-				.map((s: string) => s.trim())
-				.filter(Boolean);
-		}
 		return [];
 	});
 
-	let allVideos = $derived(productVideos());
+	let productHasVideo = $derived(!!(productVideo() || productVideoUrls().length > 0));
+
+	function getVideoUrl(): string {
+		if (productVideo()) {
+			const pbUrl = 'https://playgzero.pb.itcass.net';
+			return `${pbUrl}/api/files/estore_products/${product?.id}/${productVideo()}`;
+		}
+		return '';
+	}
+
+	let hasAnyVideo = $derived(productHasVideo);
+	let videoCount = $derived((productVideo() ? 1 : 0) + productVideoUrls().length);
+
+	let allMedia = $derived(() => {
+		const media: Array<{
+			type: 'image' | 'video' | 'youtube' | 'vimeo';
+			src: string;
+			embedUrl?: string;
+		}> = [];
+
+		for (const img of allImages) {
+			media.push({ type: 'image', src: img });
+		}
+
+		const uploadedUrl = getVideoUrl();
+		if (uploadedUrl) {
+			media.push({ type: 'video', src: uploadedUrl });
+		}
+
+		for (const url of productVideoUrls()) {
+			if (url.includes('youtube.com') || url.includes('youtu.be')) {
+				const match = url.match(/[?&]v=([\w-]+)/);
+				media.push({
+					type: 'youtube',
+					src: url,
+					embedUrl: match ? `https://www.youtube.com/embed/${match[1]}` : url
+				});
+			} else if (url.includes('vimeo.com')) {
+				const match = url.match(/vimeo\.com\/(\d+)/);
+				media.push({
+					type: 'vimeo',
+					src: url,
+					embedUrl: match ? `https://player.vimeo.com/video/${match[1]}` : url
+				});
+			}
+		}
+
+		return media;
+	});
+
+	let totalMediaSlides = $derived(allMedia().length);
 
 	function getVideoInfo(url: string): {
 		type: 'youtube' | 'vimeo' | 'direct';
@@ -85,9 +130,6 @@
 				src: url
 			};
 		}
-		if (url.includes('youtube.com/embed/')) {
-			return { type: 'youtube', embedUrl: url, src: url };
-		}
 		if (url.includes('vimeo.com/')) {
 			const match = url.match(/vimeo\.com\/(\d+)/);
 			return {
@@ -96,22 +138,40 @@
 				src: url
 			};
 		}
-		if (url.startsWith('http')) {
-			return { type: 'direct', embedUrl: '', src: url };
-		}
 		return {
 			type: 'direct',
 			embedUrl: '',
-			src: getImageUrl('estore_products', product?.id ?? '', url)
+			src: url
 		};
 	}
 
+	let videoEl: HTMLVideoElement;
+	let isVideoPlaying = $state(false);
+	let currentMedia = $derived(allMedia()[currentSlide]);
+	let currentIsVideo = $derived(
+		currentMedia?.type === 'video' ||
+			currentMedia?.type === 'youtube' ||
+			currentMedia?.type === 'vimeo'
+	);
+
+	function handleVideoClick() {
+		if (currentMedia?.type === 'video' && videoEl) {
+			if (isVideoPlaying) {
+				videoEl.pause();
+				isVideoPlaying = false;
+			} else {
+				videoEl.play();
+				isVideoPlaying = true;
+			}
+		}
+	}
+
 	function nextSlide() {
-		currentSlide = (currentSlide + 1) % totalSlides;
+		currentSlide = (currentSlide + 1) % totalMediaSlides;
 	}
 
 	function prevSlide() {
-		currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
+		currentSlide = (currentSlide - 1 + totalMediaSlides) % totalMediaSlides;
 	}
 
 	let availableColors = $derived(Array.isArray(product?.colors) ? product!.colors : []);
@@ -265,7 +325,7 @@
 			<div class="mb-16 grid grid-cols-1 gap-12 lg:grid-cols-2">
 				<div class="space-y-4">
 					<div class="relative aspect-square overflow-hidden rounded-2xl bg-bg-secondary">
-						{#each allImages as src, i}
+						{#each allMedia() as media, i}
 							<div
 								class="absolute inset-0 transition-transform duration-500 ease-in-out {i ===
 								currentSlide
@@ -274,11 +334,55 @@
 										? '-translate-x-full'
 										: 'translate-x-full'}"
 							>
-								<img
-									{src}
-									alt="{product!.name} - Image {i + 1}"
-									class="h-full w-full object-cover"
-								/>
+								{#if media.type === 'image'}
+									<img
+										src={media.src}
+										alt="{product!.name} - Image {i + 1}"
+										class="h-full w-full object-cover"
+									/>
+								{:else if media.type === 'video'}
+									<video
+										bind:this={videoEl}
+										src={media.src}
+										class="h-full w-full object-cover"
+										muted
+										loop
+										playsinline
+										preload="auto"
+										oncanplay={() => videoEl?.play()}
+										onclick={handleVideoClick}
+									>
+										<track kind="captions" />
+									</video>
+									{#if !isVideoPlaying}
+										<button
+											class="absolute inset-0 flex items-center justify-center bg-black/30"
+											onclick={handleVideoClick}
+											aria-label="Play video"
+										>
+											<div
+												class="flex h-16 w-16 items-center justify-center rounded-full bg-white/90"
+											>
+												<svg
+													class="ml-1 h-8 w-8 text-black"
+													fill="currentColor"
+													viewBox="0 0 24 24"
+												>
+													<path d="M8 5v14l11-7z" />
+												</svg>
+											</div>
+										</button>
+									{/if}
+								{:else if media.type === 'youtube' || media.type === 'vimeo'}
+									<iframe
+										src={media.embedUrl}
+										title="{product!.name} - Video {i + 1}"
+										class="h-full w-full"
+										frameborder="0"
+										allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+										allowfullscreen
+									></iframe>
+								{/if}
 							</div>
 						{/each}
 
@@ -293,55 +397,26 @@
 							</Badge>
 						{/if}
 
-						{#if totalSlides > 1}
-							<button
-								class="absolute top-1/2 left-3 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow-md transition-colors hover:bg-white"
-								onclick={prevSlide}
-								aria-label="Previous image"
-							>
-								<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M15 19l-7-7 7-7"
-									/>
-								</svg>
-							</button>
-							<button
-								class="absolute top-1/2 right-3 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow-md transition-colors hover:bg-white"
-								onclick={nextSlide}
-								aria-label="Next image"
-							>
-								<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M9 5l7 7-7 7"
-									/>
-								</svg>
-							</button>
-
+						{#if totalMediaSlides > 1}
 							<div
 								class="absolute right-4 bottom-4 z-10 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1"
 							>
-								{#each allImages as _, i}
+								{#each allMedia() as _, i}
 									<button
 										class="h-2 w-2 rounded-full transition-all {i === currentSlide
 											? 'w-4 bg-white'
 											: 'bg-white/50'}"
 										onclick={() => (currentSlide = i)}
-										aria-label="Go to image {i + 1}"
+										aria-label="Go to slide {i + 1}"
 									></button>
 								{/each}
 							</div>
 						{/if}
 					</div>
 
-					{#if totalSlides > 1}
+					{#if totalMediaSlides > 1}
 						<div class="flex gap-3 overflow-x-auto pb-1">
-							{#each allImages as src, i}
+							{#each allMedia() as media, i}
 								<button
 									class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all {currentSlide ===
 									i
@@ -349,7 +424,38 @@
 										: 'border-transparent opacity-70 hover:opacity-100'}"
 									onclick={() => (currentSlide = i)}
 								>
-									<img {src} alt="Thumbnail {i + 1}" class="h-full w-full object-cover" />
+									{#if media.type === 'image'}
+										<img
+											src={media.src}
+											alt="Thumbnail {i + 1}"
+											class="h-full w-full object-cover"
+										/>
+									{:else if media.type === 'video'}
+										<div class="flex h-full w-full items-center justify-center bg-purple-50">
+											<svg
+												class="h-8 w-8 text-purple-500"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+												/>
+											</svg>
+										</div>
+									{:else}
+										<div class="flex h-full w-full items-center justify-center bg-red-50">
+											<svg class="h-8 w-8 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+												<path
+													d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"
+												/>
+												<path fill="white" d="M9.545 15.568V8.432L15.818 12z" />
+											</svg>
+										</div>
+									{/if}
 								</button>
 							{/each}
 						</div>
@@ -589,14 +695,14 @@
 					>
 						Shipping
 					</button>
-					{#if allVideos.length > 0}
+					{#if hasAnyVideo}
 						<button
 							class="border-b-2 pb-4 font-medium transition-colors {activeTab === 'videos'
 								? 'border-accent text-accent'
 								: 'border-transparent'}"
 							onclick={() => (activeTab = 'videos')}
 						>
-							Videos ({allVideos.length})
+							Video ({videoCount})
 						</button>
 					{/if}
 				</div>
@@ -781,36 +887,25 @@
 					</div>
 				{/if}
 
-				{#if activeTab === 'videos' && allVideos.length > 0}
-					<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-						{#each allVideos as videoUrl, i}
-							{@const info = getVideoInfo(videoUrl)}
-							<div class="overflow-hidden rounded-2xl bg-white shadow-sm">
-								{#if info.type === 'youtube' || info.type === 'vimeo'}
-									<div class="relative w-full" style="padding-bottom: 56.25%;">
-										<iframe
-											src={info.embedUrl}
-											title="{product.name} - Video {i + 1}"
-											class="absolute inset-0 h-full w-full"
-											frameborder="0"
-											allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-											allowfullscreen
-										></iframe>
-									</div>
-								{:else}
-									<video
-										src={info.src}
-										controls
-										class="w-full"
-										preload="metadata"
-										aria-label="{product.name} - Video {i + 1}"
-									>
-										<track kind="captions" />
-										Your browser does not support the video tag.
-									</video>
-								{/if}
-							</div>
-						{/each}
+				{#if activeTab === 'videos' && hasAnyVideo}
+					<div class="rounded-xl bg-accent/10 p-6 text-center">
+						<svg
+							class="mx-auto mb-3 h-12 w-12 text-accent"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+							/>
+						</svg>
+						<p class="text-lg font-medium text-text-primary">Video available in carousel</p>
+						<p class="mt-1 text-sm text-text-secondary">
+							Scroll through the images above to see the product video
+						</p>
 					</div>
 				{/if}
 			</div>

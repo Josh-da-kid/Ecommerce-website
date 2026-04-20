@@ -40,13 +40,14 @@ export interface Product {
 	price: number;
 	comparePrice: number;
 	images: string | string[];
+	video: string;
+	videoUrls: string[];
 	category: string;
 	categoryData?: Category;
 	stock: number;
 	sku: string;
 	colors: string[];
 	sizes: string[];
-	videos: string | string[];
 	featured: boolean;
 	created: string;
 	updated: string;
