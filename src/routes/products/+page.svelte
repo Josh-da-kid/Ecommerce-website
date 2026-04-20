@@ -75,7 +75,7 @@
 					</Button>
 				</div>
 
-				<div class="space-y-8 {showFilters ? 'block' : 'block lg:block'}">
+				<div class="space-y-8 {showFilters ? 'block' : 'hidden lg:block'}">
 					<div>
 						<h3 class="mb-4 font-semibold text-text-primary">Search</h3>
 						<div class="relative">
