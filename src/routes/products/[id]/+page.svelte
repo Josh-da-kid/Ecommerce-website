@@ -13,7 +13,7 @@
 		products
 	} from '$lib/stores/products';
 	import { formatPrice } from '$lib/utils/index';
-	import { type Product, type Review } from '$lib/pocketbase';
+	import { pb, parseImages, getImageUrl, type Product, type Review } from '$lib/pocketbase';
 	import {
 		fetchProductReviews,
 		getUnreviewedOrdersForProduct,
@@ -24,7 +24,7 @@
 	let quantity = $state(1);
 	let currentSlide = $state(0);
 	let isAddingToCart = $state(false);
-	let activeTab = $state<'description' | 'reviews' | 'shipping'>('description');
+	let activeTab = $state<'description' | 'reviews' | 'shipping' | 'videos'>('description');
 	let selectedColor = $state('');
 	let selectedSize = $state('');
 	let variantError = $state('');
@@ -44,6 +44,67 @@
 
 	let allImages = $derived(product ? getProductImages(product) : ['/placeholder-product.svg']);
 	let totalSlides = $derived(allImages.length);
+
+	let productVideos = $derived(() => {
+		if (!product?.videos) return [];
+		const v = product.videos;
+		if (Array.isArray(v)) return v;
+		if (typeof v === 'string' && v.trim()) {
+			try {
+				const parsed = JSON.parse(v);
+				if (Array.isArray(parsed)) return parsed;
+			} catch {}
+			return v
+				.split(',')
+				.map((s: string) => s.trim())
+				.filter(Boolean);
+		}
+		return [];
+	});
+
+	let allVideos = $derived(productVideos());
+
+	function getVideoInfo(url: string): {
+		type: 'youtube' | 'vimeo' | 'direct';
+		embedUrl: string;
+		src: string;
+	} {
+		if (url.includes('youtube.com/watch')) {
+			const match = url.match(/[?&]v=([\w-]+)/);
+			return {
+				type: 'youtube',
+				embedUrl: match ? `https://www.youtube.com/embed/${match[1]}` : url,
+				src: url
+			};
+		}
+		if (url.includes('youtu.be/')) {
+			const match = url.match(/youtu\.be\/([\w-]+)/);
+			return {
+				type: 'youtube',
+				embedUrl: match ? `https://www.youtube.com/embed/${match[1]}` : url,
+				src: url
+			};
+		}
+		if (url.includes('youtube.com/embed/')) {
+			return { type: 'youtube', embedUrl: url, src: url };
+		}
+		if (url.includes('vimeo.com/')) {
+			const match = url.match(/vimeo\.com\/(\d+)/);
+			return {
+				type: 'vimeo',
+				embedUrl: match ? `https://player.vimeo.com/video/${match[1]}` : url,
+				src: url
+			};
+		}
+		if (url.startsWith('http')) {
+			return { type: 'direct', embedUrl: '', src: url };
+		}
+		return {
+			type: 'direct',
+			embedUrl: '',
+			src: getImageUrl('estore_products', product?.id ?? '', url)
+		};
+	}
 
 	function nextSlide() {
 		currentSlide = (currentSlide + 1) % totalSlides;
@@ -528,6 +589,16 @@
 					>
 						Shipping
 					</button>
+					{#if allVideos.length > 0}
+						<button
+							class="border-b-2 pb-4 font-medium transition-colors {activeTab === 'videos'
+								? 'border-accent text-accent'
+								: 'border-transparent'}"
+							onclick={() => (activeTab = 'videos')}
+						>
+							Videos ({allVideos.length})
+						</button>
+					{/if}
 				</div>
 
 				{#if activeTab === 'description'}
@@ -707,6 +778,39 @@
 							<p class="text-text-secondary">2-3 business days</p>
 							<p class="text-text-secondary">₦5,000</p>
 						</div>
+					</div>
+				{/if}
+
+				{#if activeTab === 'videos' && allVideos.length > 0}
+					<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+						{#each allVideos as videoUrl, i}
+							{@const info = getVideoInfo(videoUrl)}
+							<div class="overflow-hidden rounded-2xl bg-white shadow-sm">
+								{#if info.type === 'youtube' || info.type === 'vimeo'}
+									<div class="relative w-full" style="padding-bottom: 56.25%;">
+										<iframe
+											src={info.embedUrl}
+											title="{product.name} - Video {i + 1}"
+											class="absolute inset-0 h-full w-full"
+											frameborder="0"
+											allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+											allowfullscreen
+										></iframe>
+									</div>
+								{:else}
+									<video
+										src={info.src}
+										controls
+										class="w-full"
+										preload="metadata"
+										aria-label="{product.name} - Video {i + 1}"
+									>
+										<track kind="captions" />
+										Your browser does not support the video tag.
+									</video>
+								{/if}
+							</div>
+						{/each}
 					</div>
 				{/if}
 			</div>

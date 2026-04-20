@@ -1,6 +1,5 @@
 import Lenis from 'lenis';
 import { browser } from '$app/environment';
-import { onDestroy } from 'svelte';
 
 let lenis: Lenis | null = null;
 
@@ -28,6 +27,18 @@ export function initSmoothScroll() {
 		lenis?.destroy();
 		lenis = null;
 	};
+}
+
+export function stopSmoothScroll() {
+	if (lenis) {
+		lenis.stop();
+	}
+}
+
+export function startSmoothScroll() {
+	if (lenis) {
+		lenis.start();
+	}
 }
 
 export function scrollTo(target: string | number, offset: number = 0) {

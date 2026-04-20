@@ -46,6 +46,7 @@ export interface Product {
 	sku: string;
 	colors: string[];
 	sizes: string[];
+	videos: string | string[];
 	featured: boolean;
 	created: string;
 	updated: string;

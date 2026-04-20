@@ -2,6 +2,7 @@
 	import { cn } from '$lib/utils';
 	import { fade, scale } from 'svelte/transition';
 	import { browser } from '$app/environment';
+	import { stopSmoothScroll, startSmoothScroll } from '$lib/animations/smoothScroll';
 
 	interface Props {
 		open?: boolean;
@@ -31,15 +32,30 @@
 		onclose?.();
 	}
 
+	function lockScroll() {
+		if (!browser) return;
+		const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+		document.body.style.overflow = 'hidden';
+		document.body.style.paddingRight = `${scrollbarWidth}px`;
+		stopSmoothScroll();
+	}
+
+	function unlockScroll() {
+		if (!browser) return;
+		document.body.style.overflow = '';
+		document.body.style.paddingRight = '';
+		startSmoothScroll();
+	}
+
 	$effect(() => {
 		if (!browser) return;
 		if (open) {
-			document.body.style.overflow = 'hidden';
+			lockScroll();
 		} else {
-			document.body.style.overflow = '';
+			unlockScroll();
 		}
 		return () => {
-			document.body.style.overflow = '';
+			unlockScroll();
 		};
 	});
 </script>
@@ -50,7 +66,7 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+		class="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto overscroll-contain p-4"
 		transition:fade={{ duration: 200 }}
 	>
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -65,9 +81,9 @@
 
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
-			class="relative w-full {sizeClasses[
+			class="relative my-8 w-full {sizeClasses[
 				size
-			]} flex max-h-[90vh] flex-col rounded-2xl bg-white shadow-2xl"
+			]} flex max-h-[85vh] flex-col rounded-2xl bg-white shadow-2xl"
 			role="dialog"
 			aria-modal="true"
 		>

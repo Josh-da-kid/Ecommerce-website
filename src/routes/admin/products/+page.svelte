@@ -7,7 +7,14 @@
 		fetchCategories,
 		getProductImage
 	} from '$lib/stores/products';
-	import { pb, parseImages, getImageUrl, getProductImages, type Product } from '$lib/pocketbase';
+	import {
+		pb,
+		parseImages,
+		getImageUrl,
+		getProductImages,
+		type Product,
+		type Category
+	} from '$lib/pocketbase';
 	import { formatPrice, slugify } from '$lib/utils/index';
 	import { Button, Input, Modal } from '$lib/components/ui';
 	import { toasts } from '$lib/stores/toast';
@@ -40,10 +47,18 @@
 	let imageUrlInput = $state('');
 	let isFetchingUrl = $state(false);
 
+	let newVideoFiles = $state<File[]>([]);
+	let existingVideoFilenames = $state<string[]>([]);
+	let videoUrlInput = $state('');
+	let isFetchingVideoUrl = $state(false);
+
 	const MAX_IMAGES = 10;
+	const MAX_VIDEOS = 5;
 
 	let totalImageCount = $derived(existingFilenames.length + newImages.length);
 	let canAddMore = $derived(totalImageCount < MAX_IMAGES);
+	let totalVideoCount = $derived(existingVideoFilenames.length + newVideoFiles.length);
+	let canAddMoreVideos = $derived(totalVideoCount < MAX_VIDEOS);
 
 	let errors = $derived({
 		name: !form.name.trim() ? 'Product name is required' : '',
@@ -77,6 +92,9 @@
 		newImages = [];
 		existingFilenames = [];
 		imageUrlInput = '';
+		newVideoFiles = [];
+		existingVideoFilenames = [];
+		videoUrlInput = '';
 		editingProduct = null;
 		submitted = false;
 	}
@@ -103,6 +121,15 @@
 		};
 		existingFilenames = parseImages(product.images);
 		newImages = [];
+		existingVideoFilenames = Array.isArray(product.videos)
+			? product.videos
+			: typeof product.videos === 'string' && product.videos
+				? product.videos
+						.split(',')
+						.map((s) => s.trim())
+						.filter(Boolean)
+				: [];
+		newVideoFiles = [];
 		showModal = true;
 	}
 
@@ -172,6 +199,73 @@
 		}
 	}
 
+	function handleVideoFileInput(e: Event) {
+		const input = e.target as HTMLInputElement;
+		if (input.files) {
+			const remaining = MAX_VIDEOS - totalVideoCount;
+			const toAdd = Array.from(input.files).slice(0, remaining);
+			newVideoFiles = [...newVideoFiles, ...toAdd];
+			if (Array.from(input.files).length > toAdd.length) {
+				toasts.show('warning', `Only ${toAdd.length} video(s) added. Maximum is ${MAX_VIDEOS}.`);
+			}
+		}
+		input.value = '';
+	}
+
+	function removeNewVideo(index: number) {
+		newVideoFiles = newVideoFiles.filter((_, i) => i !== index);
+	}
+
+	function removeExistingVideo(index: number) {
+		existingVideoFilenames = existingVideoFilenames.filter((_, i) => i !== index);
+	}
+
+	async function addVideoUrl() {
+		const url = videoUrlInput.trim();
+		if (!url) return;
+
+		if (!canAddMoreVideos) {
+			toasts.show('error', `Maximum ${MAX_VIDEOS} videos allowed.`);
+			return;
+		}
+
+		if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('vimeo.com')) {
+			existingVideoFilenames = [...existingVideoFilenames, url];
+			videoUrlInput = '';
+			toasts.show('success', 'Video link added');
+			return;
+		}
+
+		isFetchingVideoUrl = true;
+		try {
+			const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
+			const res = await fetch(proxyUrl);
+			if (!res.ok) {
+				let msg = `Failed to fetch video (${res.status})`;
+				try {
+					const body = await res.json();
+					msg = body.message || body.error || msg;
+				} catch {}
+				toasts.show('error', msg);
+				return;
+			}
+
+			const blob = await res.blob();
+			const ext = blob.type.split('/')[1] || 'mp4';
+			const filename = `video_${Date.now()}.${ext}`;
+			const file = new File([blob], filename, { type: blob.type });
+			newVideoFiles = [...newVideoFiles, file];
+			videoUrlInput = '';
+			toasts.show('success', 'Video added from URL');
+		} catch {
+			existingVideoFilenames = [...existingVideoFilenames, url];
+			videoUrlInput = '';
+			toasts.show('info', 'Stored as URL (direct download not available).');
+		} finally {
+			isFetchingVideoUrl = false;
+		}
+	}
+
 	function handleNameInput() {
 		form.slug = slugify(form.name);
 	}
@@ -213,13 +307,22 @@
 					} catch {}
 				}
 
+				const pbVideoFilenames = existingVideoFilenames.filter((f) => !f.startsWith('http'));
+
 				const originalFilenames = parseImages(editingProduct.images);
-				const hasChanges =
+				const hasImageChanges =
 					allNewFiles.length > 0 ||
 					pbFilenames.length !== originalFilenames.length ||
 					pbFilenames.some((f, i) => f !== originalFilenames[i]);
 
-				if (hasChanges) {
+				const hasVideoChanges =
+					newVideoFiles.length > 0 ||
+					pbVideoFilenames.length !==
+						(Array.isArray(editingProduct.videos)
+							? editingProduct.videos.filter((v: string) => !v.startsWith('http')).length
+							: 0);
+
+				if (hasImageChanges || hasVideoChanges) {
 					const formData = new FormData();
 					formData.append('name', form.name);
 					formData.append('slug', form.slug);
@@ -241,6 +344,16 @@
 						formData.append('images', file);
 					}
 
+					const externalVideoUrls = existingVideoFilenames.filter((f) => f.startsWith('http'));
+					const allVideoRefs = [...pbVideoFilenames, ...externalVideoUrls];
+					if (allVideoRefs.length > 0) {
+						formData.append('videos', JSON.stringify(allVideoRefs));
+					}
+
+					for (const file of newVideoFiles) {
+						formData.append('videos', file);
+					}
+
 					await pb.collection('estore_products').update(editingProduct.id, formData);
 				} else {
 					const data: Record<string, unknown> = {
@@ -254,7 +367,8 @@
 						featured: form.featured,
 						category: form.category,
 						colors: colorsArray,
-						sizes: sizesArray
+						sizes: sizesArray,
+						videos: existingVideoFilenames
 					};
 
 					await pb.collection('estore_products').update(editingProduct.id, data);
@@ -277,6 +391,14 @@
 
 				for (const file of newImages) {
 					formData.append('images', file);
+				}
+
+				if (existingVideoFilenames.length > 0) {
+					formData.append('videos', JSON.stringify(existingVideoFilenames));
+				}
+
+				for (const file of newVideoFiles) {
+					formData.append('videos', file);
 				}
 
 				await pb.collection('estore_products').create(formData);
@@ -443,18 +565,13 @@
 							{/each}
 						</div>
 					{/if}
-					<div class="flex items-center justify-end gap-2 border-t border-border pt-3">
+					<div class="flex flex-wrap items-center justify-start gap-2 border-t border-border pt-3">
 						<button
 							type="button"
-							class="rounded-lg p-2 transition-colors hover:bg-bg-secondary"
+							class="inline-flex items-center gap-1.5 rounded-lg bg-bg-secondary px-3 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-accent hover:text-white"
 							onclick={() => openEditModal(product)}
 						>
-							<svg
-								class="h-5 w-5 text-text-muted"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
+							<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path
 									stroke-linecap="round"
 									stroke-linejoin="round"
@@ -462,18 +579,14 @@
 									d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
 								/>
 							</svg>
+							Edit
 						</button>
 						<button
 							type="button"
-							class="rounded-lg p-2 transition-colors hover:bg-red-50"
+							class="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-600 hover:text-white"
 							onclick={() => deleteProduct(product.id)}
 						>
-							<svg
-								class="h-5 w-5 text-red-500"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
+							<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path
 									stroke-linecap="round"
 									stroke-linejoin="round"
@@ -481,6 +594,7 @@
 									d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
 								/>
 							</svg>
+							Delete
 						</button>
 					</div>
 				</div>
@@ -826,6 +940,178 @@
 					class="h-5 w-5 rounded border-border text-accent focus:ring-accent"
 				/>
 				<label for="featured" class="text-sm font-medium text-text-primary">Featured Product</label>
+			</div>
+		</div>
+
+		<!-- Product Videos -->
+		<div>
+			<div class="mb-2 flex items-center justify-between">
+				<label class="text-sm font-medium text-text-primary">Product Videos</label>
+				<span class="text-xs {canAddMoreVideos ? 'text-text-muted' : 'font-medium text-error'}">
+					{totalVideoCount} / {MAX_VIDEOS} videos
+				</span>
+			</div>
+
+			{#if !canAddMoreVideos}
+				<div class="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+					Maximum of {MAX_VIDEOS} videos reached. Remove an existing video to add more.
+				</div>
+			{/if}
+
+			{#if existingVideoFilenames.length > 0}
+				<div class="mb-3 flex flex-wrap gap-2">
+					{#each existingVideoFilenames as filename, i}
+						{@const isExternal = filename.startsWith('http')}
+						{@const isYouTube = filename.includes('youtube.com') || filename.includes('youtu.be')}
+						{@const isVimeo = filename.includes('vimeo.com')}
+						<div class="group relative h-20 w-20 overflow-hidden rounded-lg border border-border">
+							{#if isYouTube || isVimeo}
+								<div class="flex h-full w-full items-center justify-center bg-red-50">
+									<svg class="h-8 w-8 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+										<path
+											d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"
+										/>
+										<path fill="white" d="M9.545 15.568V8.432L15.818 12z" />
+									</svg>
+								</div>
+							{:else if isExternal}
+								<div class="flex h-full w-full items-center justify-center bg-blue-50">
+									<svg
+										class="h-8 w-8 text-blue-500"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+										/>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+										/>
+									</svg>
+								</div>
+							{:else}
+								<div class="flex h-full w-full items-center justify-center bg-purple-50">
+									<svg
+										class="h-8 w-8 text-purple-500"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+										/>
+									</svg>
+								</div>
+							{/if}
+							<button
+								type="button"
+								class="absolute top-0 right-0 flex h-5 w-5 items-center justify-center rounded-bl-lg bg-error text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
+								onclick={() => removeExistingVideo(i)}
+							>
+								&times;
+							</button>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			{#if newVideoFiles.length > 0}
+				<div class="mb-3 flex flex-wrap gap-2">
+					{#each newVideoFiles as file, i}
+						<div class="relative h-20 w-20 overflow-hidden rounded-lg border border-accent/40">
+							<div class="flex h-full w-full items-center justify-center bg-green-50">
+								<svg
+									class="h-8 w-8 text-green-500"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+									/>
+								</svg>
+							</div>
+							<button
+								type="button"
+								class="absolute top-0 right-0 flex h-5 w-5 items-center justify-center rounded-bl-lg bg-error text-xs text-white"
+								onclick={() => removeNewVideo(i)}
+							>
+								&times;
+							</button>
+							<span
+								class="absolute right-0 bottom-0 left-0 truncate bg-black/60 px-1 text-[10px] text-white"
+								>{file.name}</span
+							>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			<label
+				class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-4 transition-colors hover:border-accent hover:bg-accent/5 {!canAddMoreVideos
+					? 'pointer-events-none opacity-40'
+					: ''}"
+			>
+				<svg
+					class="mb-1 h-6 w-6 text-text-muted"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="1.5"
+						d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+					/>
+				</svg>
+				<span class="text-sm text-text-secondary">Upload video</span>
+				<span class="mt-0.5 text-xs text-text-muted">MP4, WebM up to 50MB</span>
+				<input
+					type="file"
+					accept="video/*"
+					multiple
+					class="hidden"
+					onchange={handleVideoFileInput}
+					disabled={!canAddMoreVideos}
+				/>
+			</label>
+
+			<div class="mt-3 flex flex-col gap-2 sm:flex-row">
+				<input
+					type="url"
+					placeholder="Or paste a video URL (YouTube, Vimeo, or direct link)..."
+					bind:value={videoUrlInput}
+					disabled={isFetchingVideoUrl || !canAddMoreVideos}
+					class="h-10 w-full rounded-xl border border-border px-3 text-sm focus:border-accent focus:outline-none disabled:opacity-50 sm:h-12 sm:px-4"
+					onkeydown={(e) => {
+						if (e.key === 'Enter') {
+							e.preventDefault();
+							addVideoUrl();
+						}
+					}}
+				/>
+				<Button
+					variant="secondary"
+					onclick={addVideoUrl}
+					disabled={isFetchingVideoUrl || !canAddMoreVideos}
+					class="shrink-0"
+				>
+					{isFetchingVideoUrl ? 'Adding...' : 'Add Video'}
+				</Button>
 			</div>
 		</div>
 

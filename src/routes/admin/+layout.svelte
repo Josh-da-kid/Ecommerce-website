@@ -83,7 +83,7 @@
 		</div>
 	</div>
 {:else}
-	<div class="flex min-h-screen overflow-x-hidden bg-bg-secondary">
+	<div class="flex min-h-screen bg-bg-secondary">
 		{#if sidebarOpen}
 			<div
 				class="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -169,7 +169,7 @@
 			</div>
 		</aside>
 
-		<div class="min-w-0 flex-1">
+		<div class="min-w-0 flex-1 overflow-x-hidden">
 			<header
 				class="flex items-center justify-between bg-white px-4 py-3 shadow-sm sm:px-6 sm:py-4"
 			>
@@ -216,11 +216,11 @@
 			</header>
 
 			<nav class="border-b border-border bg-white lg:hidden">
-				<div class="grid grid-cols-3 gap-1 px-3 py-2">
+				<div class="flex gap-1 overflow-x-auto px-3 py-2">
 					{#each navItems as item}
 						<a
 							href={item.href}
-							class="flex items-center justify-center gap-2 rounded-lg px-2 py-2.5 text-sm font-medium transition-colors {$page
+							class="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors {$page
 								.url.pathname === item.href
 								? 'bg-accent text-white'
 								: 'text-text-secondary hover:bg-bg-secondary'}"
