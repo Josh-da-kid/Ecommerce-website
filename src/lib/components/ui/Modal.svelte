@@ -2,7 +2,6 @@
 	import { cn } from '$lib/utils';
 	import { fade, scale } from 'svelte/transition';
 	import { browser } from '$app/environment';
-	import { stopSmoothScroll, startSmoothScroll } from '$lib/animations/smoothScroll';
 
 	interface Props {
 		open?: boolean;
@@ -32,30 +31,19 @@
 		onclose?.();
 	}
 
-	function lockScroll() {
-		if (!browser) return;
-		const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-		document.body.style.overflow = 'hidden';
-		document.body.style.paddingRight = `${scrollbarWidth}px`;
-		stopSmoothScroll();
-	}
-
-	function unlockScroll() {
-		if (!browser) return;
-		document.body.style.overflow = '';
-		document.body.style.paddingRight = '';
-		startSmoothScroll();
-	}
-
 	$effect(() => {
 		if (!browser) return;
 		if (open) {
-			lockScroll();
+			const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+			document.body.style.overflow = 'hidden';
+			document.body.style.paddingRight = `${scrollbarWidth}px`;
 		} else {
-			unlockScroll();
+			document.body.style.overflow = '';
+			document.body.style.paddingRight = '';
 		}
 		return () => {
-			unlockScroll();
+			document.body.style.overflow = '';
+			document.body.style.paddingRight = '';
 		};
 	});
 </script>
@@ -66,7 +54,8 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto overscroll-contain p-4"
+		data-lenis-prevent
+		class="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto p-4"
 		transition:fade={{ duration: 200 }}
 	>
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
