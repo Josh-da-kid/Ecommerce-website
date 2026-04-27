@@ -412,6 +412,45 @@
 									></button>
 								{/each}
 							</div>
+
+							<button
+								class="absolute top-1/2 left-3 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 shadow-lg transition-colors hover:bg-white"
+								onclick={prevSlide}
+								aria-label="Previous slide"
+							>
+								<svg
+									class="h-5 w-5 text-gray-700"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M15 19l-7-7 7-7"
+									/>
+								</svg>
+							</button>
+							<button
+								class="absolute top-1/2 right-3 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 shadow-lg transition-colors hover:bg-white"
+								onclick={nextSlide}
+								aria-label="Next slide"
+							>
+								<svg
+									class="h-5 w-5 text-gray-700"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M9 5l7 7-7 7"
+									/>
+								</svg>
+							</button>
 						{/if}
 					</div>
 
