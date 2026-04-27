@@ -21,7 +21,13 @@
 	let orderTotal = $state(0);
 	let paymentReference = $state('');
 	let deliveryMethod = $state<'delivery' | 'pickup'>('delivery');
-	let paymentMethod = $state<'bank-transfer' | 'pay-on-delivery'>('bank-transfer');
+	let paymentMethod = $state<'bank-transfer' | 'pay-on-pickup'>('bank-transfer');
+
+	$effect(() => {
+		if (deliveryMethod === 'delivery') {
+			paymentMethod = 'bank-transfer';
+		}
+	});
 
 	function getLiveProduct(productId: string): Product | undefined {
 		return $products.find((p) => p.id === productId);
@@ -125,7 +131,31 @@
 		if (orderId) {
 			try {
 				await pb.collection('estore_orders').update(orderId, { status: 'cancelled' });
-			} catch {}
+
+				const orderRecord = await pb.collection('estore_orders').getOne<{ items: string }>(orderId);
+				if (orderRecord?.items) {
+					const parsed: OrderItem[] =
+						typeof orderRecord.items === 'string'
+							? JSON.parse(orderRecord.items)
+							: orderRecord.items;
+					const qtyMap: Record<string, number> = {};
+					for (const item of parsed) {
+						qtyMap[item.productId] = (qtyMap[item.productId] || 0) + item.quantity;
+					}
+					for (const pid of Object.keys(qtyMap)) {
+						try {
+							const fresh = await pb.collection('estore_products').getOne<Product>(pid);
+							await pb
+								.collection('estore_products')
+								.update(pid, { stock: fresh.stock + qtyMap[pid] });
+						} catch {
+							// product may have been deleted
+						}
+					}
+				}
+			} catch {
+				// order may not exist
+			}
 		}
 		showPaymentModal = false;
 		orderPlaced = false;
@@ -263,7 +293,7 @@
 					status: 'pending',
 					shippingAddress: JSON.stringify(shippingAddress),
 					paymentMethod: paymentMethod,
-					paymentStatus: paymentMethod === 'pay-on-delivery' ? 'pending' : 'pending',
+					paymentStatus: 'pending',
 					paymentReference: newPaymentRef,
 					user: $user?.id || '',
 					created: now,
@@ -290,7 +320,7 @@
 
 				orderTotal = $cartTotal;
 
-				if (paymentMethod === 'pay-on-delivery') {
+				if (paymentMethod === 'pay-on-pickup') {
 					cart.clear();
 					orderPlaced = true;
 				} else {
@@ -343,12 +373,10 @@
 						Order ID: <span class="font-semibold text-accent">{orderId}</span>
 					</p>
 
-					{#if paymentMethod === 'pay-on-delivery'}
+					{#if paymentMethod === 'pay-on-pickup'}
 						<div class="mb-4 rounded-xl bg-accent/10 p-4">
 							<p class="text-sm text-text-secondary">
-								{deliveryMethod === 'pickup'
-									? 'You will pay when you pick up your order at Kubwa, Abuja.'
-									: 'You will pay when your order is delivered to your address.'}
+								You will pay when you pick up your order at Kubwa, Abuja.
 							</p>
 						</div>
 					{/if}
@@ -670,49 +698,47 @@
 									</div>
 								</button>
 
-								<button
-									type="button"
-									class="w-full rounded-xl border-2 p-4 text-left transition-all {paymentMethod ===
-									'pay-on-delivery'
-										? 'border-accent bg-accent/5'
-										: 'border-border hover:border-accent/50'}"
-									onclick={() => (paymentMethod = 'pay-on-delivery')}
-								>
-									<div class="flex items-center gap-3">
-										<div
-											class="flex h-10 w-10 items-center justify-center rounded-lg {paymentMethod ===
-											'pay-on-delivery'
-												? 'bg-accent/10'
-												: 'bg-bg-secondary'}"
-										>
-											<svg
-												class="h-5 w-5 {paymentMethod === 'pay-on-delivery'
-													? 'text-accent'
-													: 'text-text-muted'}"
-												fill="none"
-												stroke="currentColor"
-												viewBox="0 0 24 24"
+								{#if deliveryMethod === 'pickup'}
+									<button
+										type="button"
+										class="w-full rounded-xl border-2 p-4 text-left transition-all {paymentMethod ===
+										'pay-on-pickup'
+											? 'border-accent bg-accent/5'
+											: 'border-border hover:border-accent/50'}"
+										onclick={() => (paymentMethod = 'pay-on-pickup')}
+									>
+										<div class="flex items-center gap-3">
+											<div
+												class="flex h-10 w-10 items-center justify-center rounded-lg {paymentMethod ===
+												'pay-on-pickup'
+													? 'bg-accent/10'
+													: 'bg-bg-secondary'}"
 											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-												/>
-											</svg>
+												<svg
+													class="h-5 w-5 {paymentMethod === 'pay-on-pickup'
+														? 'text-accent'
+														: 'text-text-muted'}"
+													fill="none"
+													stroke="currentColor"
+													viewBox="0 0 24 24"
+												>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+													/>
+												</svg>
+											</div>
+											<div>
+												<p class="font-medium text-text-primary">Pay on Pickup</p>
+												<p class="text-sm text-text-muted">
+													Pay with cash or card when you collect your order at Kubwa
+												</p>
+											</div>
 										</div>
-										<div>
-											<p class="font-medium text-text-primary">
-												Pay on {deliveryMethod === 'pickup' ? 'Pickup' : 'Delivery'}
-											</p>
-											<p class="text-sm text-text-muted">
-												{deliveryMethod === 'pickup'
-													? 'Pay when you collect your order at the pickup station'
-													: 'Pay with cash or card when your order arrives'}
-											</p>
-										</div>
-									</div>
-								</button>
+									</button>
+								{/if}
 							</div>
 						</div>
 

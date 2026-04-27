@@ -134,11 +134,11 @@
 									/>
 								</svg>
 							</div>
-							<h3 class="font-semibold text-text-primary">Pay on Delivery / Pickup</h3>
+							<h3 class="font-semibold text-text-primary">Pay on Pickup</h3>
 						</div>
 						<p class="text-sm text-text-secondary">
-							Pay with cash or card when your order is delivered to your address, or when you pick
-							up at our Kubwa station.
+							Pay with cash or card when you pick up your order at our Kubwa, Abuja station.
+							Available for pickup orders only.
 						</p>
 					</div>
 				</div>

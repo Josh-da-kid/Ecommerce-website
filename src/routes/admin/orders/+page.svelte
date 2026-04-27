@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { pb, type Order } from '$lib/pocketbase';
+	import { pb, type Order, type OrderItem, type Product } from '$lib/pocketbase';
 	import { formatPrice } from '$lib/utils/index';
 
 	let orders = $state<Order[]>([]);
@@ -53,13 +53,46 @@
 	async function updateStatus(id: string, newStatus: string) {
 		updatingStatus = id;
 		try {
+			const currentOrder = orders.find((o) => o.id === id);
+			if (!currentOrder) return;
+
 			const updateData: any = { status: newStatus };
 			if (newStatus === 'processing' || newStatus === 'delivered') {
 				updateData.paymentStatus = 'verified';
 			} else if (newStatus === 'cancelled') {
 				updateData.paymentStatus = 'rejected';
 			}
+
 			await pb.collection('estore_orders').update(id, updateData);
+
+			if (newStatus === 'cancelled' && currentOrder.status !== 'cancelled') {
+				try {
+					const freshOrder = await pb.collection('estore_orders').getOne<{ items: string }>(id);
+					if (freshOrder?.items) {
+						const parsed: OrderItem[] =
+							typeof freshOrder.items === 'string'
+								? JSON.parse(freshOrder.items)
+								: freshOrder.items;
+						const qtyMap: Record<string, number> = {};
+						for (const item of parsed) {
+							qtyMap[item.productId] = (qtyMap[item.productId] || 0) + item.quantity;
+						}
+						for (const pid of Object.keys(qtyMap)) {
+							try {
+								const product = await pb.collection('estore_products').getOne<Product>(pid);
+								await pb
+									.collection('estore_products')
+									.update(pid, { stock: product.stock + qtyMap[pid] });
+							} catch {
+								// product may have been deleted
+							}
+						}
+					}
+				} catch {
+					// failed to restore stock
+				}
+			}
+
 			orders = orders.map((o) => (o.id === id ? { ...o, ...updateData } : o));
 		} catch (e: any) {
 			error = e.message || 'Failed to update order status';

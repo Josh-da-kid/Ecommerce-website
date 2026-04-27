@@ -681,7 +681,7 @@
 									d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
 								/>
 							</svg>
-							<span>Pay on delivery</span>
+							<span>Pay on pickup</span>
 						</div>
 						<div class="flex items-center gap-2">
 							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -927,9 +927,9 @@
 							<p class="text-text-secondary">Payment confirmed within 30 minutes</p>
 						</div>
 						<div class="rounded-2xl bg-white p-6">
-							<h3 class="mb-4 font-semibold">Pay on Delivery / Pickup</h3>
-							<p class="text-text-secondary">Pay with cash or card</p>
-							<p class="text-text-secondary">Available for all orders</p>
+							<h3 class="mb-4 font-semibold">Pay on Pickup</h3>
+							<p class="text-text-secondary">Pay with cash or card at Kubwa station</p>
+							<p class="text-text-secondary">Available for pickup orders only</p>
 						</div>
 					</div>
 				{/if}
