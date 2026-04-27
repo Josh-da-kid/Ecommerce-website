@@ -24,7 +24,7 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href="/urazbox1.png" />
+	<!-- <link rel="icon" href="/box.jpeg" /> -->
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 	<link
