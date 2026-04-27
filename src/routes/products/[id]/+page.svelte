@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
-	import { Button, Badge } from '$lib/components/ui';
+	import { Button, Badge, ShareButtons } from '$lib/components/ui';
 	import { ProductCard } from '$lib/components/product';
 	import { cart, wishlist } from '$lib/stores';
 	import { user, isAuthenticated } from '$lib/stores/auth';
@@ -41,6 +41,7 @@
 	let isSubmittingReview = $state(false);
 
 	const productId = $page.params.id;
+	const productUrl = $derived(typeof window !== 'undefined' ? window.location.href : '');
 
 	let allImages = $derived(product ? getProductImages(product) : ['/placeholder-product.svg']);
 	let totalSlides = $derived(allImages.length);
@@ -642,7 +643,7 @@
 						{isOutOfStock ? 'Out of Stock' : isAddingToCart ? 'Added!' : 'Add to Cart'}
 					</Button>
 
-					<div class="flex items-center gap-6 text-sm text-text-secondary">
+					<div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-text-secondary">
 						<div class="flex items-center gap-2">
 							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path
@@ -660,11 +661,44 @@
 									stroke-linecap="round"
 									stroke-linejoin="round"
 									stroke-width="1.5"
+									d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+								/>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="1.5"
+									d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+								/>
+							</svg>
+							<span>Pickup at Kubwa, Abuja</span>
+						</div>
+						<div class="flex items-center gap-2">
+							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="1.5"
+									d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+								/>
+							</svg>
+							<span>Pay on delivery</span>
+						</div>
+						<div class="flex items-center gap-2">
+							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="1.5"
 									d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
 								/>
 							</svg>
 							<span>30-day returns</span>
 						</div>
+					</div>
+
+					<div class="mt-6">
+						<p class="mb-3 text-sm font-semibold text-text-primary">Share this product</p>
+						<ShareButtons url={productUrl} title={product?.name || ''} variant="full" />
 					</div>
 				</div>
 			</div>
@@ -875,14 +909,27 @@
 				{:else}
 					<div class="grid grid-cols-1 gap-8 md:grid-cols-2">
 						<div class="rounded-2xl bg-white p-6">
-							<h3 class="mb-4 font-semibold">Standard Shipping</h3>
-							<p class="text-text-secondary">5-7 business days</p>
+							<h3 class="mb-4 font-semibold">Home Delivery</h3>
+							<p class="text-text-secondary">3-7 business days</p>
 							<p class="text-text-secondary">Free on orders over ₦300,000</p>
 						</div>
 						<div class="rounded-2xl bg-white p-6">
-							<h3 class="mb-4 font-semibold">Express Shipping</h3>
-							<p class="text-text-secondary">2-3 business days</p>
-							<p class="text-text-secondary">₦5,000</p>
+							<h3 class="mb-4 font-semibold">Pickup Station</h3>
+							<p class="text-text-secondary">Kubwa, FCT - Abuja</p>
+							<p class="text-text-secondary">Ready in 1-3 business days</p>
+							<p class="text-text-secondary">Pay on pickup available</p>
+						</div>
+					</div>
+					<div class="mt-6 grid grid-cols-1 gap-8 md:grid-cols-2">
+						<div class="rounded-2xl bg-white p-6">
+							<h3 class="mb-4 font-semibold">Bank Transfer</h3>
+							<p class="text-text-secondary">Pay via Moniepoint (Urazbox Enterprise)</p>
+							<p class="text-text-secondary">Payment confirmed within 30 minutes</p>
+						</div>
+						<div class="rounded-2xl bg-white p-6">
+							<h3 class="mb-4 font-semibold">Pay on Delivery / Pickup</h3>
+							<p class="text-text-secondary">Pay with cash or card</p>
+							<p class="text-text-secondary">Available for all orders</p>
 						</div>
 					</div>
 				{/if}

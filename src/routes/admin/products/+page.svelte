@@ -16,7 +16,7 @@
 		type Category
 	} from '$lib/pocketbase';
 	import { formatPrice, slugify } from '$lib/utils/index';
-	import { Button, Input, Modal } from '$lib/components/ui';
+	import { Button, Input, Modal, ShareButtons } from '$lib/components/ui';
 	import { toasts } from '$lib/stores/toast';
 
 	let searchQuery = $state('');
@@ -575,6 +575,28 @@
 							</svg>
 							Edit
 						</button>
+						<a
+							href="/products/{product.id}"
+							target="_blank"
+							class="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-600 hover:text-white"
+						>
+							<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+								/>
+							</svg>
+							View
+						</a>
+						<ShareButtons
+							url="{typeof window !== 'undefined'
+								? window.location.origin
+								: ''}/products/{product.id}"
+							title={product.name}
+							variant="icon"
+						/>
 						<button
 							type="button"
 							class="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-600 hover:text-white"
@@ -707,6 +729,26 @@
 								</td>
 								<td class="px-6 py-4">
 									<div class="flex items-center justify-end gap-2">
+										<a
+											href="/products/{product.id}"
+											target="_blank"
+											class="rounded-lg p-2 transition-colors hover:bg-bg-secondary"
+											title="View product"
+										>
+											<svg
+												class="h-5 w-5 text-text-muted"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+												/>
+											</svg>
+										</a>
 										<button
 											type="button"
 											class="rounded-lg p-2 transition-colors hover:bg-bg-secondary"
@@ -726,6 +768,13 @@
 												/>
 											</svg>
 										</button>
+										<ShareButtons
+											url="{typeof window !== 'undefined'
+												? window.location.origin
+												: ''}/products/{product.id}"
+											title={product.name}
+											variant="icon"
+										/>
 										<button
 											type="button"
 											class="rounded-lg p-2 transition-colors hover:bg-red-50"

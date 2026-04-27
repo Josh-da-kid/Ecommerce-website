@@ -20,6 +20,8 @@
 	let timerInterval: any = null;
 	let orderTotal = $state(0);
 	let paymentReference = $state('');
+	let deliveryMethod = $state<'delivery' | 'pickup'>('delivery');
+	let paymentMethod = $state<'bank-transfer' | 'pay-on-delivery'>('bank-transfer');
 
 	function getLiveProduct(productId: string): Product | undefined {
 		return $products.find((p) => p.id === productId);
@@ -56,15 +58,17 @@
 	let contact = $state({ email: '', phone: '' });
 	let shipping = $state({ name: '', street: '', city: '', state: '', zip: '', country: '' });
 
+	let isDelivery = $derived(deliveryMethod === 'delivery');
+
 	let errors = $derived({
 		email: !contact.email.trim() ? 'Email is required' : '',
 		phone: !contact.phone.trim() ? 'Phone is required' : '',
-		name: !shipping.name.trim() ? 'Name is required' : '',
-		street: !shipping.street.trim() ? 'Street address is required' : '',
-		city: !shipping.city.trim() ? 'City is required' : '',
-		state: !shipping.state.trim() ? 'State is required' : '',
-		zip: !shipping.zip.trim() ? 'ZIP code is required' : '',
-		country: !shipping.country.trim() ? 'Country is required' : ''
+		name: isDelivery && !shipping.name.trim() ? 'Name is required' : '',
+		street: isDelivery && !shipping.street.trim() ? 'Street address is required' : '',
+		city: isDelivery && !shipping.city.trim() ? 'City is required' : '',
+		state: isDelivery && !shipping.state.trim() ? 'State is required' : '',
+		zip: isDelivery && !shipping.zip.trim() ? 'ZIP code is required' : '',
+		country: isDelivery && !shipping.country.trim() ? 'Country is required' : ''
 	});
 
 	let isValid = $derived(
@@ -164,16 +168,27 @@
 			size: item.size || ''
 		}));
 
-		const shippingAddress: ShippingAddress = {
-			name: shipping.name,
-			email: contact.email,
-			phone: contact.phone,
-			street: shipping.street,
-			city: shipping.city,
-			state: shipping.state,
-			zip: shipping.zip,
-			country: shipping.country
-		};
+		const shippingAddress: ShippingAddress = isDelivery
+			? {
+					name: shipping.name,
+					email: contact.email,
+					phone: contact.phone,
+					street: shipping.street,
+					city: shipping.city,
+					state: shipping.state,
+					zip: shipping.zip,
+					country: shipping.country
+				}
+			: {
+					name: contact.email,
+					email: contact.email,
+					phone: contact.phone,
+					street: 'Pickup Station',
+					city: 'Kubwa',
+					state: 'FCT - Abuja',
+					zip: '901101',
+					country: 'Nigeria'
+				};
 
 		if (browser) {
 			try {
@@ -247,13 +262,16 @@
 					total: $cartTotal,
 					status: 'pending',
 					shippingAddress: JSON.stringify(shippingAddress),
-					paymentMethod: 'bank-transfer',
-					paymentStatus: 'pending',
+					paymentMethod: paymentMethod,
+					paymentStatus: paymentMethod === 'pay-on-delivery' ? 'pending' : 'pending',
 					paymentReference: newPaymentRef,
 					user: $user?.id || '',
 					created: now,
 					updated: now,
-					expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+					expiresAt:
+						paymentMethod === 'bank-transfer'
+							? new Date(Date.now() + 30 * 60 * 1000).toISOString()
+							: ''
 				});
 				orderId = record.id;
 				paymentReference = newPaymentRef;
@@ -271,7 +289,13 @@
 				localStorage.setItem('luxe_orders', JSON.stringify(orders));
 
 				orderTotal = $cartTotal;
-				showPaymentModal = true;
+
+				if (paymentMethod === 'pay-on-delivery') {
+					cart.clear();
+					orderPlaced = true;
+				} else {
+					showPaymentModal = true;
+				}
 			} catch (_e: unknown) {
 				toasts.show('error', 'Failed to place order. Please try again.');
 				isProcessing = false;
@@ -318,6 +342,49 @@
 					<p class="mb-6 text-text-muted">
 						Order ID: <span class="font-semibold text-accent">{orderId}</span>
 					</p>
+
+					{#if paymentMethod === 'pay-on-delivery'}
+						<div class="mb-4 rounded-xl bg-accent/10 p-4">
+							<p class="text-sm text-text-secondary">
+								{deliveryMethod === 'pickup'
+									? 'You will pay when you pick up your order at Kubwa, Abuja.'
+									: 'You will pay when your order is delivered to your address.'}
+							</p>
+						</div>
+					{/if}
+
+					{#if deliveryMethod === 'pickup'}
+						<div class="mb-4 rounded-xl bg-blue-50 p-4">
+							<div class="flex items-start justify-center gap-3">
+								<svg
+									class="h-5 w-5 shrink-0 text-blue-500"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+									/>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+									/>
+								</svg>
+								<div class="text-left">
+									<p class="font-medium text-blue-800">Pickup at Kubwa, Abuja</p>
+									<p class="text-sm text-blue-600">
+										You will be notified when your order is ready for pickup.
+									</p>
+								</div>
+							</div>
+						</div>
+					{/if}
+
 					<p class="text-sm text-text-muted">Redirecting to your orders...</p>
 				</div>
 			</div>
@@ -344,8 +411,201 @@
 						{/if}
 
 						<div class="rounded-2xl bg-white p-8 shadow-lg">
-							<h2 class="mb-6 text-xl font-semibold text-text-primary">Shipping Information</h2>
-							<div class="space-y-4">
+							<h2 class="mb-4 text-xl font-semibold text-text-primary">Delivery Method</h2>
+							<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+								<button
+									type="button"
+									class="rounded-xl border-2 p-4 text-left transition-all {deliveryMethod ===
+									'delivery'
+										? 'border-accent bg-accent/5'
+										: 'border-border hover:border-accent/50'}"
+									onclick={() => (deliveryMethod = 'delivery')}
+								>
+									<div class="mb-2 flex items-center gap-3">
+										<div
+											class="flex h-10 w-10 items-center justify-center rounded-lg {deliveryMethod ===
+											'delivery'
+												? 'bg-accent/10'
+												: 'bg-bg-secondary'}"
+										>
+											<svg
+												class="h-5 w-5 {deliveryMethod === 'delivery'
+													? 'text-accent'
+													: 'text-text-muted'}"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+												/>
+											</svg>
+										</div>
+										<p class="font-semibold text-text-primary">Home Delivery</p>
+									</div>
+									<p class="text-sm text-text-secondary">
+										Door-to-door delivery to your address. 3-7 business days.
+									</p>
+								</button>
+
+								<button
+									type="button"
+									class="rounded-xl border-2 p-4 text-left transition-all {deliveryMethod ===
+									'pickup'
+										? 'border-accent bg-accent/5'
+										: 'border-border hover:border-accent/50'}"
+									onclick={() => (deliveryMethod = 'pickup')}
+								>
+									<div class="mb-2 flex items-center gap-3">
+										<div
+											class="flex h-10 w-10 items-center justify-center rounded-lg {deliveryMethod ===
+											'pickup'
+												? 'bg-accent/10'
+												: 'bg-bg-secondary'}"
+										>
+											<svg
+												class="h-5 w-5 {deliveryMethod === 'pickup'
+													? 'text-accent'
+													: 'text-text-muted'}"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+												/>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+												/>
+											</svg>
+										</div>
+										<p class="font-semibold text-text-primary">Pickup Station</p>
+									</div>
+									<p class="text-sm text-text-secondary">
+										Pick up at Kubwa, Abuja. Ready in 1-3 business days.
+									</p>
+								</button>
+							</div>
+
+							{#if deliveryMethod === 'pickup'}
+								<div class="mt-4 rounded-xl border border-accent/30 bg-accent/5 p-4">
+									<div class="flex items-start gap-3">
+										<svg
+											class="mt-0.5 h-5 w-5 shrink-0 text-accent"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+											/>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+											/>
+										</svg>
+										<div>
+											<p class="font-medium text-text-primary">Pickup Location</p>
+											<p class="text-sm text-text-secondary">Kubwa, FCT - Abuja, Nigeria</p>
+											<p class="mt-1 text-xs text-text-muted">
+												You will be notified when your order is ready for pickup.
+											</p>
+										</div>
+									</div>
+								</div>
+							{/if}
+						</div>
+
+						{#if isDelivery}
+							<div class="rounded-2xl bg-white p-8 shadow-lg">
+								<h2 class="mb-6 text-xl font-semibold text-text-primary">Shipping Information</h2>
+								<div class="space-y-4">
+									<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+										<Input
+											type="email"
+											label="Email"
+											bind:value={contact.email}
+											placeholder="your@email.com"
+											error={submitted ? errors.email : ''}
+											required
+										/>
+										<Input
+											type="tel"
+											label="Phone"
+											bind:value={contact.phone}
+											placeholder="+1 (555) 000-0000"
+											error={submitted ? errors.phone : ''}
+											required
+										/>
+									</div>
+
+									<hr class="border-border" />
+
+									<Input
+										label="Full Name"
+										bind:value={shipping.name}
+										placeholder="John Doe"
+										error={submitted ? errors.name : ''}
+										required
+									/>
+									<Input
+										label="Street Address"
+										bind:value={shipping.street}
+										placeholder="123 Main St"
+										error={submitted ? errors.street : ''}
+										required
+									/>
+									<div class="grid grid-cols-2 gap-4">
+										<Input
+											label="City"
+											bind:value={shipping.city}
+											placeholder="Lagos"
+											error={submitted ? errors.city : ''}
+											required
+										/>
+										<Input
+											label="State"
+											bind:value={shipping.state}
+											placeholder="Lagos"
+											error={submitted ? errors.state : ''}
+											required
+										/>
+									</div>
+									<div class="grid grid-cols-2 gap-4">
+										<Input
+											label="ZIP Code"
+											bind:value={shipping.zip}
+											placeholder="10001"
+											error={submitted ? errors.zip : ''}
+											required
+										/>
+										<Input
+											label="Country"
+											bind:value={shipping.country}
+											placeholder="Nigeria"
+											error={submitted ? errors.country : ''}
+											required
+										/>
+									</div>
+								</div>
+							</div>
+						{:else}
+							<div class="rounded-2xl bg-white p-8 shadow-lg">
+								<h2 class="mb-6 text-xl font-semibold text-text-primary">Contact Information</h2>
 								<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 									<Input
 										type="email"
@@ -359,87 +619,100 @@
 										type="tel"
 										label="Phone"
 										bind:value={contact.phone}
-										placeholder="+1 (555) 000-0000"
+										placeholder="+234 800 000 0000"
 										error={submitted ? errors.phone : ''}
 										required
 									/>
 								</div>
-
-								<hr class="border-border" />
-
-								<Input
-									label="Full Name"
-									bind:value={shipping.name}
-									placeholder="John Doe"
-									error={submitted ? errors.name : ''}
-									required
-								/>
-								<Input
-									label="Street Address"
-									bind:value={shipping.street}
-									placeholder="123 Main St"
-									error={submitted ? errors.street : ''}
-									required
-								/>
-								<div class="grid grid-cols-2 gap-4">
-									<Input
-										label="City"
-										bind:value={shipping.city}
-										placeholder="Lagos"
-										error={submitted ? errors.city : ''}
-										required
-									/>
-									<Input
-										label="State"
-										bind:value={shipping.state}
-										placeholder="Lagos"
-										error={submitted ? errors.state : ''}
-										required
-									/>
-								</div>
-								<div class="grid grid-cols-2 gap-4">
-									<Input
-										label="ZIP Code"
-										bind:value={shipping.zip}
-										placeholder="10001"
-										error={submitted ? errors.zip : ''}
-										required
-									/>
-									<Input
-										label="Country"
-										bind:value={shipping.country}
-										placeholder="Nigeria"
-										error={submitted ? errors.country : ''}
-										required
-									/>
-								</div>
 							</div>
-						</div>
+						{/if}
 
 						<div class="rounded-2xl bg-white p-8 shadow-lg">
 							<h2 class="mb-4 text-xl font-semibold text-text-primary">Payment Method</h2>
-							<div class="rounded-xl border-2 border-accent bg-accent/5 p-4">
-								<div class="flex items-center gap-3">
-									<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
-										<svg
-											class="h-5 w-5 text-accent"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
+							<div class="space-y-3">
+								<button
+									type="button"
+									class="w-full rounded-xl border-2 p-4 text-left transition-all {paymentMethod ===
+									'bank-transfer'
+										? 'border-accent bg-accent/5'
+										: 'border-border hover:border-accent/50'}"
+									onclick={() => (paymentMethod = 'bank-transfer')}
+								>
+									<div class="flex items-center gap-3">
+										<div
+											class="flex h-10 w-10 items-center justify-center rounded-lg {paymentMethod ===
+											'bank-transfer'
+												? 'bg-accent/10'
+												: 'bg-bg-secondary'}"
 										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M3 10h18M7 15h1m2 0h1m-2 5h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"
-											></path>
-										</svg>
+											<svg
+												class="h-5 w-5 {paymentMethod === 'bank-transfer'
+													? 'text-accent'
+													: 'text-text-muted'}"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M3 10h18M7 15h1m2 0h1m-2 5h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"
+												/>
+											</svg>
+										</div>
+										<div>
+											<p class="font-medium text-text-primary">Bank Transfer</p>
+											<p class="text-sm text-text-muted">
+												Transfer to {PAYMENT_ACCOUNT.bank} account
+											</p>
+										</div>
 									</div>
-									<div>
-										<p class="font-medium text-text-primary">Bank Transfer</p>
-										<p class="text-sm text-text-muted">Transfer to Moniepoint account</p>
+								</button>
+
+								<button
+									type="button"
+									class="w-full rounded-xl border-2 p-4 text-left transition-all {paymentMethod ===
+									'pay-on-delivery'
+										? 'border-accent bg-accent/5'
+										: 'border-border hover:border-accent/50'}"
+									onclick={() => (paymentMethod = 'pay-on-delivery')}
+								>
+									<div class="flex items-center gap-3">
+										<div
+											class="flex h-10 w-10 items-center justify-center rounded-lg {paymentMethod ===
+											'pay-on-delivery'
+												? 'bg-accent/10'
+												: 'bg-bg-secondary'}"
+										>
+											<svg
+												class="h-5 w-5 {paymentMethod === 'pay-on-delivery'
+													? 'text-accent'
+													: 'text-text-muted'}"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+												/>
+											</svg>
+										</div>
+										<div>
+											<p class="font-medium text-text-primary">
+												Pay on {deliveryMethod === 'pickup' ? 'Pickup' : 'Delivery'}
+											</p>
+											<p class="text-sm text-text-muted">
+												{deliveryMethod === 'pickup'
+													? 'Pay when you collect your order at the pickup station'
+													: 'Pay with cash or card when your order arrives'}
+											</p>
+										</div>
 									</div>
-								</div>
+								</button>
 							</div>
 						</div>
 
